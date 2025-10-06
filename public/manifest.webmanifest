@@ -1,8 +1,10 @@
 {
   "name": "VNote Sales Companion",
   "short_name": "VNote",
-  "start_url": ".",
+  "start_url": "/VNote/",
+  "scope": "/VNote/",
   "display": "standalone",
   "background_color": "#0f172a",
-  "theme_color": "#6366f1"
+  "theme_color": "#6366f1",
+  "description": "Offline-first note and guided-discovery app for sales calls. GitHub Pages build; no binary assets."
 }
