@@ -200,10 +200,34 @@ localforage.config({
   storeName: 'workspace'
 })
 
+function mergeWithBuiltInTemplates(existing: Template[]): Template[] {
+  const byName = new Map(existing.map((template) => [template.name, template]))
+  const builtInNames = new Set(builtInTemplates.map((template) => template.name))
+
+  const mergedBuiltIns = builtInTemplates.map((template) => {
+    const match = byName.get(template.name)
+    if (!match) return template
+    return { ...template, id: match.id }
+  })
+
+  const customTemplates = existing.filter((template) => !builtInNames.has(template.name))
+
+  return [...mergedBuiltIns, ...customTemplates]
+}
+
 export async function loadStore(): Promise<StoreState> {
   const stored = await localforage.getItem<StoreState>(STORAGE_KEY)
   if (stored) {
-    return stored
+    const mergedTemplates = mergeWithBuiltInTemplates(stored.templates)
+    const updatedStore: StoreState = { ...stored, templates: mergedTemplates }
+    const templatesChanged =
+      JSON.stringify(mergedTemplates) !== JSON.stringify(stored.templates)
+
+    if (templatesChanged) {
+      await saveStore(updatedStore)
+    }
+
+    return updatedStore
   }
 
   const seedProject = createProjectFromTemplate(builtInTemplates[0])
