@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import CanvasBoard from './CanvasBoard'
 import {
   Card,
@@ -12,6 +12,7 @@ import {
 import { createQuestionCard, initializeFieldState } from '../lib/questions'
 import { quickTags } from '../lib/tags'
 import { createId } from '../lib/id'
+import { findNextGridPositionWithOverflow } from '../lib/canvasLayout'
 
 interface CallModePanelProps {
   project: Project
@@ -27,17 +28,27 @@ interface QuestionPointer {
   questionId: string
 }
 
-interface HistoryEntry {
-  id: string
-  questionId: string
-  questionLabel: string
-  variantText?: string
-  answer?: string
-  tags: string[]
-  timestamp: string
-  fields?: QuestionFieldState[]
-  skipped?: boolean
-}
+type HistoryEntry =
+  | {
+      id: string
+      type: 'question'
+      questionId: string
+      questionLabel: string
+      variantText?: string
+      answer?: string
+      tags: string[]
+      timestamp: string
+      fields?: QuestionFieldState[]
+      skipped?: boolean
+    }
+  | {
+      id: string
+      type: 'freeform'
+      questionLabel: string
+      answer?: string
+      tags: string[]
+      timestamp: string
+    }
 
 function formatElapsed(startedAt: number, now: number) {
   const totalSeconds = Math.max(0, Math.floor((now - startedAt) / 1000))
@@ -159,7 +170,15 @@ export default function CallModePanel({
     [sections]
   )
   const [history, setHistory] = useState<HistoryEntry[]>([])
-  const answeredSet = useMemo(() => new Set(history.map((entry) => entry.questionId)), [history])
+  const answeredSet = useMemo(() => {
+    const answered = new Set<string>()
+    history.forEach((entry) => {
+      if (entry.type === 'question') {
+        answered.add(entry.questionId)
+      }
+    })
+    return answered
+  }, [history])
   const [currentPointer, setCurrentPointer] = useState<QuestionPointer | null>(() =>
     findFirstQuestion(sections, new Set())
   )
@@ -169,6 +188,10 @@ export default function CallModePanel({
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [fieldsState, setFieldsState] = useState<QuestionFieldState[]>([])
+  const [manualSelection, setManualSelection] = useState('')
+  const [freeformTitle, setFreeformTitle] = useState('')
+  const [freeformNotes, setFreeformNotes] = useState('')
+  const [freeformTagsInput, setFreeformTagsInput] = useState('')
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 1000)
@@ -184,6 +207,14 @@ export default function CallModePanel({
     }
   }, [sections, answeredSet, currentPointer])
 
+  useEffect(() => {
+    if (currentPointer) {
+      setManualSelection(`${currentPointer.sectionId}|${currentPointer.questionId}`)
+    } else {
+      setManualSelection('')
+    }
+  }, [currentPointer])
+
   const currentSection = currentPointer
     ? sections.find((section) => section.id === currentPointer.sectionId)
     : undefined
@@ -198,6 +229,20 @@ export default function CallModePanel({
     const defaults = currentQuestion?.tags.map((tag) => tag.toLowerCase()) ?? []
     return Array.from(new Set([...defaults, ...quickTags]))
   }, [currentQuestion?.id])
+
+  const manualOptions = useMemo(
+    () =>
+      sections.map((section) => ({
+        section,
+        questions: section.questions.map((question) => ({
+          question,
+          answered: answeredSet.has(question.id)
+        }))
+      })),
+    [sections, answeredSet]
+  )
+
+  const canSaveFreeform = freeformTitle.trim().length > 0 || freeformNotes.trim().length > 0
 
   useEffect(() => {
     if (!currentQuestion) {
@@ -229,7 +274,12 @@ export default function CallModePanel({
     return collectSequentialSuggestions(currentPointer, sections, answered, 3)
   }, [answeredSet, currentPointer, currentQuestion?.id, sections])
 
-  const progressCount = history.filter((entry) => !entry.skipped).length
+  const progressCount = history.reduce((count, entry) => {
+    if (entry.type === 'question' && !entry.skipped) {
+      return count + 1
+    }
+    return count
+  }, 0)
   const elapsed = formatElapsed(sessionStartedAt, now)
 
   const toggleTag = (tag: string) => {
@@ -248,25 +298,52 @@ export default function CallModePanel({
     )
   }
 
+  const handleJumpToQuestion = useCallback((pointer: QuestionPointer) => {
+    setCurrentPointer(pointer)
+  }, [])
+
+  const handleManualSelect = useCallback(
+    (value: string) => {
+      setManualSelection(value)
+      if (!value) return
+      const [sectionId, questionId] = value.split('|')
+      if (sectionId && questionId) {
+        handleJumpToQuestion({ sectionId, questionId })
+      }
+    },
+    [handleJumpToQuestion]
+  )
+
   const handleSubmit = () => {
     if (!currentQuestion || !currentSection) return
+    const { position, overflowed } = findNextGridPositionWithOverflow(canvas.cards)
     const variantForCard: QuestionVariant =
       currentVariant ?? { id: `${currentQuestion.id}-default`, text: currentQuestion.label, tone: 'warm' }
+    const trimmedAnswer = answer.trim()
     const card = createQuestionCard({
       question: currentQuestion,
       variant: variantForCard,
-      answer: answer.trim(),
+      answer: trimmedAnswer,
       extraTags: selectedTags,
-      fields: fieldsState.length ? fieldsState : undefined
+      fields: fieldsState.length ? fieldsState : undefined,
+      position
     })
-    onCanvasChange({ ...canvas, cards: [card, ...canvas.cards] })
+    const nextCanvas: Canvas = {
+      ...canvas,
+      cards: [card, ...canvas.cards]
+    }
+    if (overflowed) {
+      nextCanvas.zoom = Math.max(0.4, canvas.zoom - 0.1)
+    }
+    onCanvasChange(nextCanvas)
     const tagSet = new Set(card.tags.map((tag) => tag.toLowerCase()))
     const entry: HistoryEntry = {
       id: createId('call-entry'),
+      type: 'question',
       questionId: currentQuestion.id,
       questionLabel: currentQuestion.label,
       variantText: variantForCard.text,
-      answer: answer.trim(),
+      answer: trimmedAnswer,
       tags: card.tags,
       timestamp: new Date().toISOString(),
       fields: card.type === 'question' ? card.fields : undefined,
@@ -291,6 +368,7 @@ export default function CallModePanel({
     if (!currentQuestion || !currentSection) return
     const entry: HistoryEntry = {
       id: createId('call-entry'),
+      type: 'question',
       questionId: currentQuestion.id,
       questionLabel: currentQuestion.label,
       tags: Array.from(activeTags),
@@ -310,6 +388,54 @@ export default function CallModePanel({
     setCurrentPointer(nextPointer)
   }
 
+  const handleFreeformSubmit = () => {
+    if (!freeformTitle.trim() && !freeformNotes.trim()) return
+    const title = freeformTitle.trim() || 'Freeform note'
+    const content = freeformNotes.trim()
+    const inputTags = freeformTagsInput
+      .split(',')
+      .map((tag) => tag.trim().toLowerCase())
+      .filter(Boolean)
+    const normalizedTags = Array.from(new Set(['freeform', ...inputTags]))
+    const { position, overflowed } = findNextGridPositionWithOverflow(canvas.cards)
+    const now = new Date().toISOString()
+    const freeformCard: Card = {
+      id: createId('card'),
+      type: 'sticky',
+      title,
+      content,
+      tags: normalizedTags,
+      pinned: false,
+      locked: false,
+      color: '#fef3c7',
+      priority: 'medium',
+      x: position.x,
+      y: position.y,
+      createdAt: now,
+      updatedAt: now
+    }
+    const nextCanvas: Canvas = {
+      ...canvas,
+      cards: [freeformCard, ...canvas.cards]
+    }
+    if (overflowed) {
+      nextCanvas.zoom = Math.max(0.4, canvas.zoom - 0.1)
+    }
+    onCanvasChange(nextCanvas)
+    const entry: HistoryEntry = {
+      id: createId('call-entry'),
+      type: 'freeform',
+      questionLabel: title,
+      answer: content,
+      tags: normalizedTags,
+      timestamp: now
+    }
+    setHistory((prev) => [...prev, entry])
+    setFreeformTitle('')
+    setFreeformNotes('')
+    setFreeformTagsInput('')
+  }
+
   const handleRestart = () => {
     setHistory([])
     setSessionStartedAt(Date.now())
@@ -317,6 +443,9 @@ export default function CallModePanel({
     setAnswer('')
     setSelectedTags([])
     setFieldsState([])
+    setFreeformTitle('')
+    setFreeformNotes('')
+    setFreeformTagsInput('')
   }
 
   return (
@@ -402,6 +531,18 @@ export default function CallModePanel({
                     <textarea
                       value={answer}
                       onChange={(event) => setAnswer(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (
+                          event.key === 'Enter' &&
+                          !event.shiftKey &&
+                          !event.altKey &&
+                          !event.metaKey &&
+                          !event.ctrlKey
+                        ) {
+                          event.preventDefault()
+                          handleSubmit()
+                        }
+                      }}
                       rows={4}
                       placeholder="Type what you heard…"
                       className="w-full rounded-3xl border border-indigo-200/50 bg-white/90 p-3 text-sm shadow-inner focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:border-slate-700/60 dark:bg-slate-900/70 dark:text-slate-100"
@@ -593,8 +734,24 @@ export default function CallModePanel({
                     <p className="font-semibold text-slate-600 dark:text-slate-200">Upcoming</p>
                     <ul className="mt-2 space-y-1">
                       {sequentialSuggestions.map((item) => (
-                        <li key={item.question.id} className="text-slate-500 dark:text-slate-400">
-                          <span className="font-semibold text-indigo-500 dark:text-indigo-200">{item.section.title}</span> → {item.question.label}
+                        <li key={item.question.id}>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleJumpToQuestion({
+                                sectionId: item.section.id,
+                                questionId: item.question.id
+                              })
+                            }
+                            className="flex w-full items-center justify-between rounded-2xl px-2 py-1 text-left text-slate-500 transition hover:bg-indigo-50/60 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-slate-400 dark:hover:bg-slate-800/60"
+                          >
+                            <span>
+                              <span className="font-semibold text-indigo-500 dark:text-indigo-200">{item.section.title}</span> → {item.question.label}
+                            </span>
+                            <span className="text-[11px] font-semibold uppercase tracking-wide text-indigo-500 dark:text-indigo-200">
+                              Jump
+                            </span>
+                          </button>
                         </li>
                       ))}
                     </ul>
@@ -615,6 +772,76 @@ export default function CallModePanel({
                 </button>
               </div>
             )}
+            <div className="rounded-3xl border border-slate-200/60 bg-white/70 p-3 text-xs dark:border-slate-700/60 dark:bg-slate-900/60">
+              <p className="font-semibold text-slate-600 dark:text-slate-200">Jump around</p>
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                Pick any question if the conversation goes off-script.
+              </p>
+              <div className="mt-2">
+                <label className="sr-only" htmlFor="call-question-picker">
+                  Choose a question to jump to
+                </label>
+                <select
+                  id="call-question-picker"
+                  value={manualSelection}
+                  onChange={(event) => handleManualSelect(event.target.value)}
+                  className="w-full rounded-2xl border border-indigo-300/40 bg-white/80 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:border-slate-700/60 dark:bg-slate-900/60"
+                >
+                  <option value="">Choose a question…</option>
+                  {manualOptions.map(({ section, questions }) => (
+                    <optgroup key={section.id} label={section.title}>
+                      {questions.map(({ question, answered }) => (
+                        <option key={question.id} value={`${section.id}|${question.id}`}>
+                          {question.label}
+                          {answered ? ' • answered' : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="rounded-3xl border border-slate-200/60 bg-white/70 p-3 text-xs dark:border-slate-700/60 dark:bg-slate-900/60">
+              <p className="font-semibold text-slate-600 dark:text-slate-200">Freeform capture</p>
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                Drop unscripted insights or moments directly onto the canvas.
+              </p>
+              <div className="mt-3 space-y-2">
+                <input
+                  value={freeformTitle}
+                  onChange={(event) => setFreeformTitle(event.target.value)}
+                  placeholder="Title (optional)"
+                  className="w-full rounded-2xl border border-indigo-300/40 bg-white/80 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:border-slate-700/60 dark:bg-slate-900/60"
+                />
+                <textarea
+                  value={freeformNotes}
+                  onChange={(event) => setFreeformNotes(event.target.value)}
+                  rows={3}
+                  placeholder="Capture the unexpected…"
+                  className="w-full rounded-2xl border border-indigo-300/40 bg-white/80 p-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:border-slate-700/60 dark:bg-slate-900/60"
+                />
+                <input
+                  value={freeformTagsInput}
+                  onChange={(event) => setFreeformTagsInput(event.target.value)}
+                  placeholder="Tags (comma separated)"
+                  className="w-full rounded-2xl border border-indigo-300/40 bg-white/80 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:border-slate-700/60 dark:bg-slate-900/60"
+                />
+              </div>
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleFreeformSubmit}
+                  disabled={!canSaveFreeform}
+                  className={`rounded-2xl px-4 py-2 text-xs font-semibold shadow transition focus:outline-none focus:ring-2 focus:ring-emerald-400 ${
+                    canSaveFreeform
+                      ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                      : 'cursor-not-allowed bg-slate-200 text-slate-400 dark:bg-slate-800/60 dark:text-slate-500'
+                  }`}
+                >
+                  Save freeform note
+                </button>
+              </div>
+            </div>
           </section>
           <section className="glass-panel max-h-[70vh] overflow-y-auto p-4">
             <header className="mb-3 flex items-center justify-between">
@@ -646,25 +873,36 @@ export default function CallModePanel({
                             {entry.questionLabel}
                           </p>
                         </div>
-                        {entry.skipped ? (
-                          <span className="rounded-full bg-amber-500/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-300">
-                            Skipped
-                          </span>
+                        {entry.type === 'question' ? (
+                          entry.skipped ? (
+                            <span className="rounded-full bg-amber-500/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-300">
+                              Skipped
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-indigo-500/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-indigo-500 dark:text-indigo-200">
+                              Captured
+                            </span>
+                          )
                         ) : (
-                          <span className="rounded-full bg-indigo-500/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-indigo-500 dark:text-indigo-200">
-                            Captured
+                          <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-300">
+                            Freeform
                           </span>
                         )}
                       </div>
-                      {entry.variantText && (
+                      {entry.type === 'question' && entry.variantText && (
                         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Prompt: {entry.variantText}</p>
                       )}
-                      {!entry.skipped && entry.answer && (
+                      {entry.type === 'question' && !entry.skipped && entry.answer && (
                         <p className="mt-2 rounded-2xl bg-indigo-500/5 p-2 text-sm text-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
                           {entry.answer}
                         </p>
                       )}
-                      {entry.fields && entry.fields.length > 0 && (
+                      {entry.type === 'freeform' && entry.answer && (
+                        <p className="mt-2 rounded-2xl bg-emerald-500/5 p-2 text-sm text-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
+                          {entry.answer}
+                        </p>
+                      )}
+                      {entry.type === 'question' && entry.fields && entry.fields.length > 0 && (
                         <div className="mt-2 space-y-1 text-xs text-slate-500 dark:text-slate-400">
                           {entry.fields.map((field) => (
                             <p key={field.id}>
