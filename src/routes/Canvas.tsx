@@ -10,7 +10,15 @@ import MutualActionPlan from '../components/MutualActionPlan'
 import HelpShortcuts from '../components/HelpShortcuts'
 import ImportDialog from '../components/ImportDialog'
 import { useUndoRedo } from '../hooks/useUndoRedo'
-import { Card, Canvas as CanvasType } from '../lib/storage'
+import {
+  Card,
+  Canvas as CanvasType,
+  ScriptQuestion,
+  QuestionVariant,
+  QuestionFieldState,
+  ScriptInput,
+  FieldValue
+} from '../lib/storage'
 import { createId } from '../lib/id'
 
 export default function CanvasRoute() {
@@ -123,16 +131,42 @@ export default function CanvasRoute() {
     }))
   }
 
-  const handleCaptureAnswer = (_questionId: string, variantText: string) => {
+  const initializeFieldValue = (input: ScriptInput): QuestionFieldState => {
+    let value: FieldValue
+    switch (input.type) {
+      case 'checkbox':
+        value = Boolean(input.defaultValue)
+        break
+      case 'multiSelect':
+      case 'tags':
+        value = Array.isArray(input.defaultValue) ? [...input.defaultValue] : []
+        break
+      case 'number':
+        value = typeof input.defaultValue === 'number' ? input.defaultValue : null
+        break
+      default:
+        value =
+          typeof input.defaultValue === 'string'
+            ? input.defaultValue
+            : input.defaultValue == null
+              ? ''
+              : String(input.defaultValue)
+    }
+    return { ...input, value }
+  }
+
+  const handleCaptureAnswer = (question: ScriptQuestion, variant: QuestionVariant) => {
     const now = new Date().toISOString()
     const card: Card = {
       id: createId('card'),
       type: 'question',
-      title: variantText.slice(0, 48),
-      content: variantText,
+      title: question.label,
+      content: variant.text,
       answer: '',
-      variants: [],
-      tags: ['question'],
+      variants: question.variants.map((option) => ({ ...option })),
+      tags: Array.from(new Set(['question', ...question.tags.map((tag) => tag.toLowerCase())])),
+      questionId: question.id,
+      fields: question.inputs?.map((input) => initializeFieldValue(input)),
       pinned: false,
       locked: false,
       color: '#e0e7ff',
