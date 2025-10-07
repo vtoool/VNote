@@ -5,20 +5,33 @@ import { StoreContext } from '../App'
 import { search } from '../lib/search'
 import { strings } from '../lib/i18n'
 
-export default function SearchBar() {
+type SearchBarProps = {
+  autoFocus?: boolean
+  containerClassName?: string
+  inputClassName?: string
+  onNavigate?: () => void
+}
+
+export default function SearchBar({
+  autoFocus = false,
+  containerClassName,
+  inputClassName,
+  onNavigate
+}: SearchBarProps = {}) {
   const store = useContext(StoreContext)!
   const navigate = useNavigate()
   const [term, setTerm] = useState('')
   const results = useMemo(() => (term ? search(store.projects, term) : []), [store.projects, term])
 
   return (
-    <div className="relative w-full max-w-md">
+    <div className={`relative w-full ${containerClassName ?? 'max-w-md'}`}>
       <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
       <input
         value={term}
         onChange={(event) => setTerm(event.target.value)}
         placeholder={strings.searchPlaceholder}
-        className="w-full rounded-2xl border-0 bg-slate-900/5 py-2 pl-10 pr-4 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-white/10 dark:text-slate-100"
+        className={`w-full rounded-2xl border-0 bg-slate-900/5 py-2 pl-10 pr-4 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-white/10 dark:text-slate-100 ${inputClassName ?? ''}`}
+        autoFocus={autoFocus}
       />
       {term && results.length > 0 && (
         <div className="glass-panel absolute left-0 right-0 top-12 max-h-80 overflow-y-auto p-3 text-sm">
@@ -33,6 +46,7 @@ export default function SearchBar() {
                       navigate(`/project/${result.projectId}`)
                     }
                     setTerm('')
+                    onNavigate?.()
                   }}
                   className="w-full rounded-2xl px-3 py-2 text-left hover:bg-indigo-500/10"
                 >
