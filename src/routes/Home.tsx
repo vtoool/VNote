@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import { PlusIcon, SparklesIcon, DocumentDuplicateIcon, TrashIcon } from '@heroicons/react/24/outline'
 import { StoreContext } from '../App'
 import { strings } from '../lib/i18n'
-import { Template } from '../lib/storage'
+import TemplatePickerDialog from '../components/TemplatePickerDialog'
 
 export default function Home() {
   const store = useContext(StoreContext)!
   const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
-  const [template, setTemplate] = useState<Template | undefined>(store.templates[0])
+  const [isTemplateDialogOpen, setTemplateDialogOpen] = useState(false)
 
   const filtered = useMemo(() => {
     const term = searchTerm.toLowerCase()
@@ -30,21 +30,9 @@ export default function Home() {
           </p>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-3">
-          <select
-            value={template?.id}
-            onChange={(event) => setTemplate(store.templates.find((tpl) => tpl.id === event.target.value))}
-            className="rounded-2xl border border-indigo-200 bg-white/80 px-3 py-2 text-sm shadow-soft focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:border-slate-700/50 dark:bg-slate-900/70"
-          >
-            {store.templates.map((tpl) => (
-              <option key={tpl.id} value={tpl.id}>
-                {tpl.name}
-              </option>
-            ))}
-          </select>
           <button
             onClick={() => {
-              const project = store.addProject(template)
-              if (project) navigate(`/project/${project.id}`)
+              setTemplateDialogOpen(true)
             }}
             className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-500 px-4 py-2 text-sm font-semibold text-white shadow-soft hover:shadow-glow"
           >
@@ -120,6 +108,19 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      <TemplatePickerDialog
+        open={isTemplateDialogOpen}
+        templates={store.templates}
+        onClose={() => setTemplateDialogOpen(false)}
+        onSelect={(tpl) => {
+          const project = store.addProject(tpl)
+          if (project) {
+            setTemplateDialogOpen(false)
+            navigate(`/project/${project.id}`)
+          }
+        }}
+      />
     </div>
   )
 }
