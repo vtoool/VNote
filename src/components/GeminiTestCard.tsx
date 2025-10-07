@@ -23,8 +23,6 @@ type GeminiGenerateResponse = {
 export default function GeminiTestCard({
   className = "",
 }: GeminiTestCardProps) {
-  const defaultApiKey = DEFAULT_GEMINI_API_KEY.trim();
-  const [apiKey, setApiKey] = useState(defaultApiKey);
   const [prompt, setPrompt] = useState("");
   const [response, setResponse] = useState<string | null>(null);
   const [rawResponse, setRawResponse] = useState<GeminiGenerateResponse | null>(
@@ -41,13 +39,6 @@ export default function GeminiTestCard({
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const sanitizedApiKey = (apiKey || defaultApiKey).trim();
-
-    if (!sanitizedApiKey) {
-      setError("Please enter your Gemini API key before sending a prompt.");
-      return;
-    }
-
     if (!prompt.trim()) {
       setError("Add a prompt so Gemini knows what to respond to.");
       return;
@@ -60,7 +51,7 @@ export default function GeminiTestCard({
 
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(
-        sanitizedApiKey,
+        DEFAULT_GEMINI_API_KEY,
       )}`;
 
       const res = await fetch(url, {
@@ -122,28 +113,11 @@ export default function GeminiTestCard({
             <span className="font-medium text-slate-700 dark:text-slate-200">
               gemini-2.5-flash
             </span>{" "}
-            using a client-side request.
+            using a client-side request—no API key required.
           </p>
         </div>
       </div>
       <form className="space-y-3" onSubmit={handleSubmit}>
-        <div className="space-y-2">
-          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            Gemini API key
-          </label>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(event) => setApiKey(event.target.value)}
-            placeholder="Paste your key here"
-            className="w-full rounded-2xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm text-slate-700 shadow-sm placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-700/60 dark:bg-slate-950/40 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-violet-400 dark:focus:ring-violet-500/30"
-          />
-          <p className="text-xs text-slate-400 dark:text-slate-500">
-            The key stays in your browser session and is never stored by VNote. {" "}
-            Pre-fill it by updating DEFAULT_GEMINI_API_KEY in src/config/gemini.ts if you
-            want to avoid pasting it each time.
-          </p>
-        </div>
         <div className="space-y-2">
           <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
             Prompt
@@ -151,7 +125,7 @@ export default function GeminiTestCard({
           <textarea
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
-            placeholder="Ask Gemini anything to test your credentials..."
+            placeholder="Ask Gemini anything..."
             rows={4}
             className="w-full rounded-2xl border border-slate-200/60 bg-white/70 px-4 py-3 text-sm text-slate-700 shadow-sm placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-700/60 dark:bg-slate-950/40 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-violet-400 dark:focus:ring-violet-500/30"
           />
