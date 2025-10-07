@@ -1,6 +1,6 @@
 import { createContext, useEffect, useMemo, useState } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
-import { CommandLineIcon, MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import { CommandLineIcon, Cog6ToothIcon, MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useLocalStore } from './hooks/useLocalStore'
 import { applyTheme, loadTheme, saveTheme, ThemeState } from './lib/theme'
 import { exportProjectToJson, exportProjectToText } from './lib/export'
@@ -44,6 +44,15 @@ function Header({ onOpenCommand }: { onOpenCommand: () => void }) {
           {strings.appTitle}
         </button>
         <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigate('/settings')}
+            className="inline-flex items-center gap-2 rounded-2xl bg-slate-900/5 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-900/10 dark:bg-white/10 dark:text-slate-200"
+            aria-label="Open settings"
+          >
+            <Cog6ToothIcon className="h-4 w-4" />
+            <span className="hidden sm:inline">Settings</span>
+          </button>
           <button
             type="button"
             onClick={() => setMobileSearchOpen(true)}
