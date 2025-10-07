@@ -5,6 +5,11 @@ import { Card, Canvas } from '../lib/storage'
 import CardComponent from './Card'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 
+const MIN_ZOOM = 0.4
+const MAX_ZOOM = 1.6
+const GRID_PADDING_SCALE = 3
+const GRID_SPACING = 48
+
 interface CanvasBoardProps {
   canvas: Canvas
   onChange: (canvas: Canvas) => void
@@ -15,6 +20,7 @@ interface CanvasBoardProps {
 export default function CanvasBoard({ canvas, onChange, onCardChange, onCardDelete }: CanvasBoardProps) {
   const [showGrid, setShowGrid] = useState(true)
   const [isPanning, setIsPanning] = useState(false)
+  const boardRef = useRef<HTMLDivElement>(null)
   const panStartRef = useRef<{
     pointerId: number
     originX: number
@@ -57,6 +63,22 @@ export default function CanvasBoard({ canvas, onChange, onCardChange, onCardDele
     setIsPanning(false)
   }
 
+  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    const zoomIntensity = 0.0015
+    const nextZoom = Math.min(
+      MAX_ZOOM,
+      Math.max(MIN_ZOOM, canvas.zoom * Math.exp(-event.deltaY * zoomIntensity))
+    )
+
+    if (nextZoom === canvas.zoom) return
+
+    onChange({
+      ...canvas,
+      zoom: nextZoom
+    })
+  }
+
   return (
     <div
       className="relative h-[70vh] w-full overflow-hidden rounded-3xl border border-slate-200/60 bg-slate-100/80 dark:border-slate-700/60 dark:bg-slate-900/60">
@@ -68,13 +90,13 @@ export default function CanvasBoard({ canvas, onChange, onCardChange, onCardDele
           {showGrid ? 'Hide grid' : 'Show grid'}
         </button>
         <button
-          onClick={() => onChange({ ...canvas, zoom: Math.min(canvas.zoom + 0.1, 1.6) })}
+          onClick={() => onChange({ ...canvas, zoom: Math.min(canvas.zoom + 0.1, MAX_ZOOM) })}
           className="rounded-2xl bg-white/70 px-3 py-1 text-xs text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/70 dark:text-slate-300"
         >
           +
         </button>
         <button
-          onClick={() => onChange({ ...canvas, zoom: Math.max(canvas.zoom - 0.1, 0.4) })}
+          onClick={() => onChange({ ...canvas, zoom: Math.max(canvas.zoom - 0.1, MIN_ZOOM) })}
           className="rounded-2xl bg-white/70 px-3 py-1 text-xs text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/70 dark:text-slate-300"
         >
           –
@@ -87,54 +109,70 @@ export default function CanvasBoard({ canvas, onChange, onCardChange, onCardDele
         </button>
       </div>
       <motion.div
-        className={`absolute inset-0 ${showGrid ? 'bg-[radial-gradient(circle,_rgba(79,70,229,0.22)_1.5px,_transparent_0)] bg-[length:36px_36px]' : ''} ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
+        ref={boardRef}
+        className={`absolute inset-0 ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
         animate={{ scale: canvas.zoom, x: canvas.position.x, y: canvas.position.y }}
-        transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+        transition={{ type: 'spring', stiffness: 420, damping: 40, mass: 0.6 }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={endPan}
         onPointerCancel={endPan}
-        style={{ touchAction: 'none' }}
+        onWheel={handleWheel}
+        style={{ touchAction: 'none', transformOrigin: '0 0' }}
       >
-        {canvas.cards.map((card) => (
-          <Rnd
-            key={card.id}
-            position={{ x: card.x, y: card.y }}
-            size={{ width: card.width, height: card.height }}
-            onDragStop={(event, data) => {
-              onCardChange({ ...card, x: data.x, y: data.y, updatedAt: new Date().toISOString() })
-            }}
-            onResizeStop={(event, direction, ref, delta, position) => {
-              onCardChange({
-                ...card,
-                width: Number(ref.style.width.replace('px', '')),
-                height: Number(ref.style.height.replace('px', '')),
-                x: position.x,
-                y: position.y,
-                updatedAt: new Date().toISOString()
-              })
-            }}
-            enableResizing={!card.locked}
-            disableDragging={card.locked}
-            style={{ zIndex: card.pinned ? 20 : undefined }}
-            minWidth={200}
-            minHeight={160}
-            resizeHandleStyles={{
-              bottomRight: {
-                width: '16px',
-                height: '16px',
-                borderRadius: '9999px',
-                border: '2px solid rgba(255,255,255,0.8)',
-                background: 'rgba(79,70,229,0.85)',
-                right: '8px',
-                bottom: '8px',
-                boxShadow: '0 4px 10px rgba(79,70,229,0.35)'
-              }
-            }}
-          >
-            <CardComponent card={card} onChange={onCardChange} onDelete={() => onCardDelete(card.id)} />
-          </Rnd>
-        ))}
+        <div
+          aria-hidden
+          className={`pointer-events-none absolute ${showGrid ? 'opacity-100' : 'opacity-0'} transition-opacity duration-200 ease-out`}
+          style={{
+            top: `-${GRID_PADDING_SCALE * 100}%`,
+            right: `-${GRID_PADDING_SCALE * 100}%`,
+            bottom: `-${GRID_PADDING_SCALE * 100}%`,
+            left: `-${GRID_PADDING_SCALE * 100}%`,
+            backgroundImage: 'radial-gradient(circle, rgba(79,70,229,0.2) 1.5px, transparent 0)',
+            backgroundSize: `${GRID_SPACING}px ${GRID_SPACING}px`
+          }}
+        />
+        <div className="relative h-full w-full">
+          {canvas.cards.map((card) => (
+            <Rnd
+              key={card.id}
+              position={{ x: card.x, y: card.y }}
+              size={{ width: card.width, height: card.height }}
+              onDragStop={(event, data) => {
+                onCardChange({ ...card, x: data.x, y: data.y, updatedAt: new Date().toISOString() })
+              }}
+              onResizeStop={(event, direction, ref, delta, position) => {
+                onCardChange({
+                  ...card,
+                  width: Number(ref.style.width.replace('px', '')),
+                  height: Number(ref.style.height.replace('px', '')),
+                  x: position.x,
+                  y: position.y,
+                  updatedAt: new Date().toISOString()
+                })
+              }}
+              enableResizing={!card.locked}
+              disableDragging={card.locked}
+              style={{ zIndex: card.pinned ? 20 : undefined }}
+              minWidth={200}
+              minHeight={160}
+              resizeHandleStyles={{
+                bottomRight: {
+                  width: '22px',
+                  height: '22px',
+                  borderRadius: '9999px',
+                  border: '1px solid rgba(255,255,255,0.65)',
+                  background: 'linear-gradient(135deg, rgba(129,140,248,0.95), rgba(99,102,241,0.95))',
+                  right: '10px',
+                  bottom: '10px',
+                  boxShadow: '0 8px 16px rgba(79,70,229,0.35), inset 0 1px 2px rgba(255,255,255,0.6)'
+                }
+              }}
+            >
+              <CardComponent card={card} onChange={onCardChange} onDelete={() => onCardDelete(card.id)} />
+            </Rnd>
+          ))}
+        </div>
       </motion.div>
     </div>
   )
