@@ -19,6 +19,7 @@ import {
 } from '../lib/storage'
 import { builtInTemplates } from '../lib/templates'
 import { createId } from '../lib/id'
+import { findNextGridPosition, snapPointToGrid } from '../lib/canvasLayout'
 
 interface StoreActions {
   hydrate: () => Promise<void>
@@ -135,7 +136,26 @@ const useZustandStore = create<LocalStore>()((set, get) => ({
               canvas.id === canvasId
                 ? {
                     ...canvas,
-                    cards: [card, ...canvas.cards],
+                    cards: [
+                      {
+                        ...card,
+                        ...(() => {
+                          const fallbackPosition = findNextGridPosition(canvas.cards)
+                          const hasPosition = Number.isFinite(card.x) && Number.isFinite(card.y)
+                          if (!hasPosition) {
+                            return fallbackPosition
+                          }
+
+                          const provided = snapPointToGrid({ x: card.x, y: card.y })
+                          const occupied = canvas.cards.some((existing) => {
+                            const snappedExisting = snapPointToGrid({ x: existing.x, y: existing.y })
+                            return snappedExisting.x === provided.x && snappedExisting.y === provided.y
+                          })
+                          return occupied ? fallbackPosition : provided
+                        })()
+                      },
+                      ...canvas.cards
+                    ],
                     updatedAt: new Date().toISOString()
                   }
                 : canvas

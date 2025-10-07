@@ -1,6 +1,7 @@
 import localforage from 'localforage'
 import { createId } from './id'
 import { builtInTemplates } from './templates'
+import { findNextGridPosition } from './canvasLayout'
 
 export type CardType = 'sticky' | 'checklist' | 'question' | 'media' | 'text'
 
@@ -16,8 +17,8 @@ export interface BaseCard {
   priority: 'low' | 'medium' | 'high'
   x: number
   y: number
-  width: number
-  height: number
+  width?: number
+  height?: number
   createdAt: string
   updatedAt: string
 }
@@ -283,10 +284,8 @@ function createCardFromSeed(seed: TemplateCardSeed): Card {
     locked: false,
     color: seed.color ?? '#f8fafc',
     priority: 'medium' as const,
-    x: Math.random() * 120,
-    y: Math.random() * 120,
-    width: 260,
-    height: 240,
+    x: 0,
+    y: 0,
     createdAt: now,
     updatedAt: now
   }
@@ -314,7 +313,13 @@ export function createProjectFromTemplate(template: Template): Project {
   const now = new Date().toISOString()
   const initialCanvas = createEmptyCanvas('Discovery Notes')
   if (template.defaultCards?.length) {
-    initialCanvas.cards = template.defaultCards.map((seed) => createCardFromSeed(seed))
+    const positionedCards: Card[] = []
+    template.defaultCards.forEach((seed) => {
+      const card = createCardFromSeed(seed)
+      const position = findNextGridPosition(positionedCards)
+      positionedCards.push({ ...card, ...position })
+    })
+    initialCanvas.cards = positionedCards
   }
   return {
     id: createId('project'),

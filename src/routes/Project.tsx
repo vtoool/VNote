@@ -4,6 +4,7 @@ import { PlusIcon, ArrowLeftIcon } from '@heroicons/react/24/outline'
 import { StoreContext } from '../App'
 import { strings } from '../lib/i18n'
 import { createEmptyCanvas } from '../lib/storage'
+import { findNextGridPosition } from '../lib/canvasLayout'
 import { createQuestionCard } from '../lib/questions'
 
 export default function ProjectRoute() {
@@ -189,7 +190,8 @@ export default function ProjectRoute() {
                             onClick={() => {
                               if (!project.canvases[0]) return
                               const canvas = project.canvases[0]
-                              const card = createQuestionCard({ question, variant })
+                              const position = findNextGridPosition(canvas.cards)
+                              const card = createQuestionCard({ question, variant, position })
                               store.addCard(project.id, canvas.id, card)
                             }}
                             className="block w-full rounded-2xl bg-indigo-500/10 px-3 py-2 text-left text-xs text-indigo-600 transition hover:bg-indigo-500/20 dark:text-indigo-200"

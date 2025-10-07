@@ -86,10 +86,8 @@ export function createQuestionCard({
     locked: false,
     color: '#e0e7ff',
     priority: 'medium',
-    x: position?.x ?? Math.random() * 160,
-    y: position?.y ?? Math.random() * 160,
-    width: 260,
-    height: 200,
+    x: position?.x ?? 0,
+    y: position?.y ?? 0,
     createdAt: now,
     updatedAt: now
   }

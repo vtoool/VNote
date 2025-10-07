@@ -2,13 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Rnd } from 'react-rnd'
 import { motion } from 'framer-motion'
 import { Card, Canvas } from '../lib/storage'
+import { GRID_SPACING, snapPointToGrid } from '../lib/canvasLayout'
 import CardComponent from './Card'
-import type { PointerEvent as ReactPointerEvent } from 'react'
 
 const MIN_ZOOM = 0.4
 const MAX_ZOOM = 1.6
 const GRID_PADDING_SCALE = 3
-const GRID_SPACING = 48
 
 interface CanvasBoardProps {
   canvas: Canvas
@@ -20,77 +19,96 @@ interface CanvasBoardProps {
 export default function CanvasBoard({ canvas, onChange, onCardChange, onCardDelete }: CanvasBoardProps) {
   const [showGrid, setShowGrid] = useState(true)
   const [isPanning, setIsPanning] = useState(false)
-  const boardRef = useRef<HTMLDivElement>(null)
-  const panStartRef = useRef<{
-    pointerId: number
+  const containerRef = useRef<HTMLDivElement>(null)
+  const pointerStateRef = useRef<{
     originX: number
     originY: number
     canvasX: number
     canvasY: number
   } | null>(null)
+  const latestCanvasRef = useRef(canvas)
+  const onChangeRef = useRef(onChange)
 
-  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return
-    const target = event.target as HTMLElement | null
-    if (target && target.closest('[data-card-root="true"]')) {
-      return
-    }
-    event.preventDefault()
-    event.currentTarget.setPointerCapture(event.pointerId)
-    setIsPanning(true)
-    panStartRef.current = {
-      pointerId: event.pointerId,
-      originX: event.clientX,
-      originY: event.clientY,
-      canvasX: canvas.position.x,
-      canvasY: canvas.position.y
-    }
-  }
+  useEffect(() => {
+    latestCanvasRef.current = canvas
+  }, [canvas])
 
-  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!isPanning || !panStartRef.current) return
-    event.preventDefault()
-    const { originX, originY, canvasX, canvasY } = panStartRef.current
-    const nextPosition = {
-      x: canvasX + (event.clientX - originX),
-      y: canvasY + (event.clientY - originY)
-    }
-    onChange({ ...canvas, position: nextPosition })
-  }
+  useEffect(() => {
+    onChangeRef.current = onChange
+  }, [onChange])
 
-  const endPan = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!panStartRef.current) return
-    if (event.currentTarget.hasPointerCapture(panStartRef.current.pointerId)) {
-      event.currentTarget.releasePointerCapture(panStartRef.current.pointerId)
-    }
-    panStartRef.current = null
-    setIsPanning(false)
-  }
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
 
-  const handleWheel = useCallback(
-    (event: WheelEvent) => {
-      if (event.ctrlKey || event.metaKey) {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.button !== 0 && event.pointerType !== 'touch') return
+      const target = event.target as HTMLElement | null
+      if (target?.closest('[data-card-root="true"]')) {
         return
       }
       event.preventDefault()
-      const zoomIntensity = 0.0015
-      const nextZoom = Math.min(
-        MAX_ZOOM,
-        Math.max(MIN_ZOOM, canvas.zoom * Math.exp(-event.deltaY * zoomIntensity))
-      )
+      pointerStateRef.current = {
+        originX: event.clientX,
+        originY: event.clientY,
+        canvasX: latestCanvasRef.current.position.x,
+        canvasY: latestCanvasRef.current.position.y
+      }
+      setIsPanning(true)
+    }
 
-      if (nextZoom === canvas.zoom) return
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!pointerStateRef.current) return
+      event.preventDefault()
+      const { originX, originY, canvasX, canvasY } = pointerStateRef.current
+      const nextPosition = {
+        x: canvasX + (event.clientX - originX),
+        y: canvasY + (event.clientY - originY)
+      }
+      onChangeRef.current({ ...latestCanvasRef.current, position: nextPosition })
+    }
 
-      onChange({
-        ...canvas,
-        zoom: nextZoom
-      })
-    },
-    [canvas, onChange]
-  )
+    const endPan = () => {
+      if (!pointerStateRef.current) return
+      pointerStateRef.current = null
+      setIsPanning(false)
+    }
+
+    container.addEventListener('pointerdown', handlePointerDown)
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', endPan)
+    window.addEventListener('pointercancel', endPan)
+
+    return () => {
+      container.removeEventListener('pointerdown', handlePointerDown)
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', endPan)
+      window.removeEventListener('pointercancel', endPan)
+    }
+  }, [])
+
+  const handleWheel = useCallback((event: WheelEvent) => {
+    if (event.ctrlKey || event.metaKey) {
+      return
+    }
+    event.preventDefault()
+    const zoomIntensity = 0.0015
+    const current = latestCanvasRef.current
+    const nextZoom = Math.min(
+      MAX_ZOOM,
+      Math.max(MIN_ZOOM, current.zoom * Math.exp(-event.deltaY * zoomIntensity))
+    )
+
+    if (nextZoom === current.zoom) return
+
+    onChangeRef.current({
+      ...current,
+      zoom: nextZoom
+    })
+  }, [])
 
   useEffect(() => {
-    const node = boardRef.current
+    const node = containerRef.current
     if (!node) return
     node.addEventListener('wheel', handleWheel, { passive: false })
     return () => {
@@ -100,7 +118,8 @@ export default function CanvasBoard({ canvas, onChange, onCardChange, onCardDele
 
   return (
     <div
-      className="relative h-[70vh] w-full overflow-hidden rounded-3xl border border-slate-200/60 bg-slate-100/80 dark:border-slate-700/60 dark:bg-slate-900/60"
+      ref={containerRef}
+      className={`relative h-[70vh] w-full overflow-hidden rounded-3xl border border-slate-200/60 bg-slate-100/80 dark:border-slate-700/60 dark:bg-slate-900/60 ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
       role="region"
       aria-label="Canvas workspace"
     >
@@ -136,14 +155,9 @@ export default function CanvasBoard({ canvas, onChange, onCardChange, onCardDele
         </button>
       </div>
       <motion.div
-        ref={boardRef}
-        className={`absolute inset-0 ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
+        className="absolute inset-0"
         animate={{ scale: canvas.zoom, x: canvas.position.x, y: canvas.position.y }}
         transition={{ type: 'spring', stiffness: 420, damping: 40, mass: 0.6 }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={endPan}
-        onPointerCancel={endPan}
         style={{ touchAction: 'none', transformOrigin: '0 0' }}
       >
         <div
@@ -164,17 +178,22 @@ export default function CanvasBoard({ canvas, onChange, onCardChange, onCardDele
               key={card.id}
               data-card-root="true"
               position={{ x: card.x, y: card.y }}
-              size={{ width: card.width, height: card.height }}
+              size={{ width: card.width ?? 'auto', height: card.height ?? 'auto' }}
+              scale={canvas.zoom}
               onDragStop={(event, data) => {
-                onCardChange({ ...card, x: data.x, y: data.y, updatedAt: new Date().toISOString() })
+                const snapped = snapPointToGrid({ x: data.x, y: data.y })
+                onCardChange({ ...card, x: snapped.x, y: snapped.y, updatedAt: new Date().toISOString() })
               }}
               onResizeStop={(event, direction, ref, delta, position) => {
+                const snapped = snapPointToGrid({ x: position.x, y: position.y })
+                const nextWidth = Number.parseFloat(ref.style.width)
+                const nextHeight = Number.parseFloat(ref.style.height)
                 onCardChange({
                   ...card,
-                  width: Number(ref.style.width.replace('px', '')),
-                  height: Number(ref.style.height.replace('px', '')),
-                  x: position.x,
-                  y: position.y,
+                  width: Number.isFinite(nextWidth) ? nextWidth : undefined,
+                  height: Number.isFinite(nextHeight) ? nextHeight : undefined,
+                  x: snapped.x,
+                  y: snapped.y,
                   updatedAt: new Date().toISOString()
                 })
               }}
