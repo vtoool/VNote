@@ -2,6 +2,8 @@
 
 A delightful, offline-first workspace for sales and success teams to capture guided discovery notes. Built with React, TypeScript, Tailwind, Framer Motion, and local-first storage so it runs perfectly on GitHub Pages.
 
+👉 **Live site:** https://vtoool.github.io/VNote/
+
 ## Features
 
 - ✨ Project dashboard with template-based project creation, fuzzy search, duplication, and friendly empty states.
