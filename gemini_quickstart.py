@@ -7,15 +7,17 @@ import subprocess
 import sys
 
 # Ensure google-genai is installed/up to date. The -q flag keeps pip quiet.
-subprocess.check_call([
-    sys.executable,
-    "-m",
-    "pip",
-    "install",
-    "-q",
-    "-U",
-    "google-genai",
-])
+subprocess.check_call(
+    [
+        sys.executable,
+        "-m",
+        "pip",
+        "install",
+        "-q",
+        "-U",
+        "google-genai",
+    ]
+)
 
 from google import genai
 
@@ -25,7 +27,7 @@ def main() -> None:
 
     # Replace the placeholder below with your actual Gemini API key before running
     # this script.
-    api_key = "AIzaSyCNhEJt6wbopVGULGiuYmbPsXWh9DSBHOc"
+    api_key = "YOUR_GEMINI_API_KEY"
 
     # Initialize the client. Passing the key explicitly makes it clear which
     # credentials are being used.

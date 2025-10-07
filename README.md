@@ -52,6 +52,10 @@ The included workflow in `.github/workflows/deploy.yml` builds the app and publi
 - Adjust the three starter templates in `src/lib/templates.ts`.
 - Localize strings in `src/lib/i18n.ts`.
 
+### Try your Gemini API key
+
+Head to the **Settings** page from the sidebar to find the Gemini API tester card. Paste a valid API key, enter a prompt, and send a test request to confirm your credentials. The call is made straight from your browser using the official REST endpoint, so avoid sharing keys you would not be comfortable exposing client-side.
+
 ## Future roadmap
 
 - **Real-time collaboration:** Introduce a multiplayer canvas powered by a CRDT engine such as [Yjs](https://yjs.dev/) to keep cards, scripts, and guided prompts in sync across participants. Pair the CRDT document with awareness metadata so teams can see who is editing in real time.
