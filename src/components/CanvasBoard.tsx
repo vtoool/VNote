@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Rnd } from 'react-rnd'
 import { motion } from 'framer-motion'
 import { Card, Canvas } from '../lib/storage'
@@ -67,48 +67,70 @@ export default function CanvasBoard({ canvas, onChange, onCardChange, onCardDele
     setIsPanning(false)
   }
 
-  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
-    event.preventDefault()
-    event.stopPropagation()
-    const zoomIntensity = 0.0015
-    const nextZoom = Math.min(
-      MAX_ZOOM,
-      Math.max(MIN_ZOOM, canvas.zoom * Math.exp(-event.deltaY * zoomIntensity))
-    )
+  const handleWheel = useCallback(
+    (event: WheelEvent) => {
+      if (event.ctrlKey || event.metaKey) {
+        return
+      }
+      event.preventDefault()
+      const zoomIntensity = 0.0015
+      const nextZoom = Math.min(
+        MAX_ZOOM,
+        Math.max(MIN_ZOOM, canvas.zoom * Math.exp(-event.deltaY * zoomIntensity))
+      )
 
-    if (nextZoom === canvas.zoom) return
+      if (nextZoom === canvas.zoom) return
 
-    onChange({
-      ...canvas,
-      zoom: nextZoom
-    })
-  }
+      onChange({
+        ...canvas,
+        zoom: nextZoom
+      })
+    },
+    [canvas, onChange]
+  )
+
+  useEffect(() => {
+    const node = boardRef.current
+    if (!node) return
+    node.addEventListener('wheel', handleWheel, { passive: false })
+    return () => {
+      node.removeEventListener('wheel', handleWheel)
+    }
+  }, [handleWheel])
 
   return (
     <div
-      className="relative h-[70vh] w-full overflow-hidden rounded-3xl border border-slate-200/60 bg-slate-100/80 dark:border-slate-700/60 dark:bg-slate-900/60">
+      className="relative h-[70vh] w-full overflow-hidden rounded-3xl border border-slate-200/60 bg-slate-100/80 dark:border-slate-700/60 dark:bg-slate-900/60"
+      role="region"
+      aria-label="Canvas workspace"
+    >
       <div className="absolute right-4 top-4 z-20 flex gap-2">
         <button
           onClick={() => setShowGrid((prev) => !prev)}
-          className="rounded-2xl bg-white/70 px-3 py-1 text-xs text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/70 dark:text-slate-300"
+          className="inline-flex h-10 items-center justify-center rounded-2xl bg-white/70 px-4 py-2 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-slate-900/70 dark:text-slate-300"
+          aria-pressed={showGrid}
+          aria-label={showGrid ? 'Hide grid' : 'Show grid'}
         >
           {showGrid ? 'Hide grid' : 'Show grid'}
         </button>
         <button
           onClick={() => onChange({ ...canvas, zoom: Math.max(canvas.zoom - 0.1, MIN_ZOOM) })}
-          className="rounded-2xl bg-white/70 px-3 py-1 text-xs text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/70 dark:text-slate-300"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/70 text-base text-slate-600 shadow-sm transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-slate-900/70 dark:text-slate-300"
+          aria-label="Zoom out"
         >
           –
         </button>
         <button
           onClick={() => onChange({ ...canvas, zoom: Math.min(canvas.zoom + 0.1, MAX_ZOOM) })}
-          className="rounded-2xl bg-white/70 px-3 py-1 text-xs text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/70 dark:text-slate-300"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/70 text-base text-slate-600 shadow-sm transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-slate-900/70 dark:text-slate-300"
+          aria-label="Zoom in"
         >
           +
         </button>
         <button
           onClick={() => onChange({ ...canvas, zoom: 1, position: { x: 0, y: 0 } })}
-          className="rounded-2xl bg-white/70 px-3 py-1 text-xs text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/70 dark:text-slate-300"
+          className="inline-flex h-10 items-center justify-center rounded-2xl bg-white/70 px-4 py-2 text-xs font-medium text-slate-600 shadow-sm transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-slate-900/70 dark:text-slate-300"
+          aria-label="Reset canvas view"
         >
           Reset
         </button>
@@ -122,7 +144,6 @@ export default function CanvasBoard({ canvas, onChange, onCardChange, onCardDele
         onPointerMove={handlePointerMove}
         onPointerUp={endPan}
         onPointerCancel={endPan}
-        onWheel={handleWheel}
         style={{ touchAction: 'none', transformOrigin: '0 0' }}
       >
         <div

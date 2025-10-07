@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { PencilSquareIcon } from '@heroicons/react/24/outline'
 import { Card, QuestionFieldState } from '../lib/storage'
 import { createId } from '../lib/id'
 import { quickTags } from '../lib/tags'
@@ -11,8 +12,31 @@ interface CardProps {
 
 export default function CardComponent({ card, onChange, onDelete }: CardProps) {
   const [editingTitle, setEditingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState(card.title)
+  const titleInputRef = useRef<HTMLInputElement>(null)
 
   const baseClasses = 'h-full w-full rounded-3xl border border-white/70 bg-white/90 p-4 text-sm shadow-soft dark:border-slate-800/70 dark:bg-slate-900/80'
+
+  useEffect(() => {
+    setTitleDraft(card.title)
+  }, [card.title])
+
+  useEffect(() => {
+    if (editingTitle) {
+      requestAnimationFrame(() => {
+        titleInputRef.current?.focus()
+        titleInputRef.current?.select()
+      })
+    }
+  }, [editingTitle])
+
+  const commitTitle = () => {
+    const nextTitle = titleDraft.trim() || 'Untitled'
+    if (nextTitle !== card.title) {
+      onChange({ ...card, title: nextTitle, updatedAt: new Date().toISOString() })
+    }
+    setEditingTitle(false)
+  }
 
   const toggleTag = (tag: string) => {
     const tags = card.tags.includes(tag) ? card.tags.filter((t) => t !== tag) : [...card.tags, tag]
@@ -190,28 +214,75 @@ export default function CardComponent({ card, onChange, onDelete }: CardProps) {
 
   return (
     <div className={baseClasses} data-card-root="true">
-      <div className="mb-2 flex items-start justify-between">
+      <div className="mb-2 flex items-start justify-between gap-2">
         {editingTitle ? (
           <input
-            value={card.title}
-            onChange={(event) => onChange({ ...card, title: event.target.value, updatedAt: new Date().toISOString() })}
-            onBlur={() => setEditingTitle(false)}
-            autoFocus
+            ref={titleInputRef}
+            value={titleDraft}
+            onChange={(event) => setTitleDraft(event.target.value)}
+            onBlur={commitTitle}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                commitTitle()
+              }
+              if (event.key === 'Escape') {
+                event.preventDefault()
+                setTitleDraft(card.title)
+                setEditingTitle(false)
+              }
+            }}
             disabled={card.locked}
-            className="w-full rounded-2xl border border-indigo-300/50 bg-white/70 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            aria-label="Card title"
+            className="w-full rounded-2xl border border-indigo-300/50 bg-white/70 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-indigo-400"
           />
         ) : (
-          <button
-            onClick={() => !card.locked && setEditingTitle(true)}
-            className="text-left text-base font-semibold text-slate-700 dark:text-slate-100"
-          >
-            {card.title || 'Untitled'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onDoubleClick={() => !card.locked && setEditingTitle(true)}
+              title="Double-click to rename"
+              className="text-left text-base font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-white dark:text-slate-100"
+            >
+              {card.title || 'Untitled'}
+            </button>
+            <button
+              type="button"
+              onClick={() => !card.locked && setEditingTitle(true)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-indigo-500/10 text-indigo-600 transition hover:bg-indigo-500/20 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:text-indigo-200"
+              aria-label="Edit card title"
+            >
+              <PencilSquareIcon className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
         )}
-        <div className="flex gap-2 text-xs text-slate-500">
-          <button onClick={() => onChange({ ...card, pinned: !card.pinned, updatedAt: new Date().toISOString() })}>{card.pinned ? '📌' : '📍'}</button>
-          <button onClick={() => onChange({ ...card, locked: !card.locked, updatedAt: new Date().toISOString() })}>{card.locked ? '🔒' : '🔓'}</button>
-          <button onClick={onDelete}>✖</button>
+        <div className="flex items-center gap-1 text-xs text-slate-500">
+          <button
+            type="button"
+            onClick={() => onChange({ ...card, pinned: !card.pinned, updatedAt: new Date().toISOString() })}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/70 text-base transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-slate-800/60"
+            aria-pressed={card.pinned}
+            aria-label={card.pinned ? 'Unpin card' : 'Pin card'}
+          >
+            {card.pinned ? '📌' : '📍'}
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange({ ...card, locked: !card.locked, updatedAt: new Date().toISOString() })}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/70 text-base transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-slate-800/60"
+            aria-pressed={card.locked}
+            aria-label={card.locked ? 'Unlock card' : 'Lock card'}
+          >
+            {card.locked ? '🔒' : '🔓'}
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-rose-500/10 text-base text-rose-600 transition hover:bg-rose-500/20 focus:outline-none focus:ring-2 focus:ring-rose-400"
+            aria-label="Delete card"
+          >
+            ✖
+          </button>
         </div>
       </div>
 

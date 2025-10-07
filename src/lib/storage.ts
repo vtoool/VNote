@@ -164,6 +164,7 @@ export interface Template {
   script: Script
   personalBullets: string[]
   defaultCards?: TemplateCardSeed[]
+  builtIn?: boolean
 }
 
 export interface VersionEntry {
@@ -205,12 +206,21 @@ function mergeWithBuiltInTemplates(existing: Template[]): Template[] {
   const builtInNames = new Set(builtInTemplates.map((template) => template.name))
 
   const mergedBuiltIns = builtInTemplates.map((template) => {
-    const match = byName.get(template.name)
-    if (!match) return template
-    return { ...template, id: match.id }
+    const stored = byName.get(template.name)
+    if (!stored) {
+      return { ...template, builtIn: true }
+    }
+    return {
+      ...template,
+      ...stored,
+      id: stored.id,
+      builtIn: true
+    }
   })
 
-  const customTemplates = existing.filter((template) => !builtInNames.has(template.name))
+  const customTemplates = existing
+    .filter((template) => !builtInNames.has(template.name))
+    .map((template) => ({ ...template, builtIn: template.builtIn ?? false }))
 
   return [...mergedBuiltIns, ...customTemplates]
 }

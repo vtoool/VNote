@@ -896,27 +896,31 @@ export const builtInTemplates: Template[] = [
         tags: ['checklist', 'first-contact'],
         color: '#eef2ff'
       }
-    ]
+    ],
+    builtIn: true
   },
   {
     id: createId('template'),
     name: 'Travel Agent Discovery',
     description: 'Guide travelers through planning with warmth and precision.',
     script: travelAgentScript,
-    personalBullets: ['Confirm traveler names', 'Verify loyalty programs', 'Capture must-haves']
+    personalBullets: ['Confirm traveler names', 'Verify loyalty programs', 'Capture must-haves'],
+    builtIn: true
   },
   {
     id: createId('template'),
     name: 'B2B SaaS Discovery',
     description: 'Dig into pains, impact, and decision process for SaaS buyers.',
     script: saasScript,
-    personalBullets: ['Ask about existing contracts', 'Note integration requirements', 'Capture security questions']
+    personalBullets: ['Ask about existing contracts', 'Note integration requirements', 'Capture security questions'],
+    builtIn: true
   },
   {
     id: createId('template'),
     name: 'Support Triage',
     description: 'Keep support conversations calm and focused on next steps.',
     script: supportScript,
-    personalBullets: ['Document environment details', 'Check recent changes', 'Offer follow-up time']
+    personalBullets: ['Document environment details', 'Check recent changes', 'Offer follow-up time'],
+    builtIn: true
   }
 ]

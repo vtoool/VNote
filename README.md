@@ -52,4 +52,10 @@ The included workflow in `.github/workflows/deploy.yml` builds the app and publi
 - Adjust the three starter templates in `src/lib/templates.ts`.
 - Localize strings in `src/lib/i18n.ts`.
 
+## Future roadmap
+
+- **Real-time collaboration:** Introduce a multiplayer canvas powered by a CRDT engine such as [Yjs](https://yjs.dev/) to keep cards, scripts, and guided prompts in sync across participants. Pair the CRDT document with awareness metadata so teams can see who is editing in real time.
+- **Syncable workspace backend:** Layer a lightweight synchronization service (e.g., a Node.js or Go API) behind the local store to persist projects, handle authentication, and stream CRDT updates between devices.
+- **CRM connectivity:** Provide connectors for CRM APIs such as Salesforce and HubSpot. Allow users to authenticate, map fields between canvases and CRM objects, and push captured answers or mutual action plans directly into opportunity records.
+
 Enjoy smoother discovery calls!
