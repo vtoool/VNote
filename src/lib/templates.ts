@@ -182,9 +182,9 @@ const businessTicketsScript: Script = {
           label: 'Quick intro + consent',
           tags: ['Identity'],
           variants: variants([
-            "Hey there, it’s {agent} with Business-Tickets—do you have a minute right now?",
-            "Hi, this is {agent} from Business-Tickets. Is this still a good time to connect?",
-            "You’re chatting with {agent} at Business-Tickets—shall we dive in now or circle back later?"
+            "Hello, this is {agent}, a travel manager at Business-Tickets.com where you requested an airline ticket. Is this a good time to talk?",
+            "Hi, my name is {agent} with Business-Tickets.com following up on your ticket request. Do you have a moment now?",
+            "Good day, {agent} here from Business-Tickets.com about your airfare inquiry. Is now still convenient to chat?"
           ]),
           inputs: [
             {
@@ -207,9 +207,9 @@ const businessTicketsScript: Script = {
           label: 'Preferred name',
           tags: ['Identity'],
           variants: variants([
-            'How do you like to be addressed?',
-            "What name should I put in my notes for you?",
-            'If I send a recap, which name should I use?'
+            'May I have your name please—how should I address you?',
+            'Could you confirm how I should address you during the call?',
+            'To make sure I note it correctly, what name would you like me to use?'
           ]),
           inputs: [
             {
@@ -225,9 +225,9 @@ const businessTicketsScript: Script = {
           label: 'History with Business-Tickets',
           tags: ['Identity'],
           variants: variants([
-            'Have we helped you before, or is this the first time we’ve connected?',
-            'Curious—have you worked with anyone on our team previously?',
-            'Have you partnered with Business-Tickets before? If so, who looked after you?'
+            'Have you worked with Business-Tickets.com before, or is this your first time calling?',
+            'Is this your first time working with Business-Tickets.com or have we helped you previously?',
+            'Have you spoken with anyone at Business-Tickets.com before, and do you recall who assisted you?'
           ]),
           inputs: [
             {
@@ -264,9 +264,9 @@ const businessTicketsScript: Script = {
           label: 'How they found us',
           tags: ['Source'],
           variants: variants([
-            'Where did Business-Tickets pop up on your radar?',
-            'Did someone refer you, or did you stumble on us elsewhere?',
-            'I’d love to know how we landed on your shortlist—what’s the story?'
+            'How did you hear about Business-Tickets.com?',
+            'Did someone refer you to Business-Tickets.com, or did you find us another way?',
+            'Just so I note it correctly, how did Business-Tickets.com come to your attention?'
           ]),
           inputs: [
             {
@@ -303,9 +303,9 @@ const businessTicketsScript: Script = {
           label: 'Trip snapshot',
           tags: ['Trip'],
           variants: variants([
-            "Mind if I sanity-check your route and dates?",
-            'Let me make sure I’ve got the basics right—where are we flying and when?',
-            'Can we lock in the core itinerary together?'
+            'Let me confirm the itinerary: you’re flying from _____ to _____ on _____ and returning on _____. Does that look right?',
+            'I want to double-check the trip details—departing from _____ to _____ on _____ with the return on _____. Is that correct?',
+            'To make sure I have it accurate: departing _____ to _____ on _____ and returning _____; is that the plan?'
           ]),
           inputs: [
             { id: 'from_airport', label: 'Origin airport', type: 'shortText', placeholder: 'e.g., JFK' },
@@ -329,9 +329,9 @@ const businessTicketsScript: Script = {
           label: 'Date flexibility',
           tags: ['Flexibility'],
           variants: variants([
-            'If fares swing a bit, how much can we slide the dates?',
-            'Are you locked into those dates or is there wiggle room?',
-            'Could we move a day or two if that unlocks better space?'
+            'Are your travel dates flexible if I find a better fare or itinerary?',
+            'If the price is better, how much flexibility do you have on the departure or return dates?',
+            'Would you be able to move your dates slightly if it helped secure a better deal?'
           ]),
           inputs: [
             {
@@ -358,9 +358,9 @@ const businessTicketsScript: Script = {
           label: 'Airport flexibility',
           tags: ['Flexibility'],
           variants: variants([
-            'Any nearby airports we can consider on either end?',
-            'Open to alternate airports if it means better availability?',
-            'Should we price out sister airports for departure or arrival?'
+            'Is your departure or arrival airport flexible if it helps with the fare?',
+            'Would you consider alternate airports for departure or arrival to improve options?',
+            'Are there nearby airports you would be open to if it leads to better availability?'
           ]),
           inputs: [
             {
@@ -395,9 +395,9 @@ const businessTicketsScript: Script = {
           label: 'Passengers',
           tags: ['Pax', 'Passengers'],
           variants: variants([
-            'How many travelers are we planning seats for?',
-            'Who’s flying—any kids or special considerations?',
-            'Give me the headcount and note any little ones with ages.'
+            'How many passengers will be traveling?',
+            'Who is taking the trip, and are there any children traveling?',
+            'Can you confirm the passenger count and let me know if there are any children with ages?'
           ]),
           inputs: [
             { id: 'adult_count', label: 'Adults', type: 'number', placeholder: 'Number of adults' },
@@ -410,9 +410,9 @@ const businessTicketsScript: Script = {
           label: 'Cabin preference',
           tags: ['Cabin', 'Req'],
           variants: variants([
-            'Which cabin are you leaning toward for this journey?',
-            'Are we thinking business, first, or something else this time?',
-            'Is this a premium cabin trip or do we explore other classes?'
+            'What cabin class would you like to book for this trip?',
+            'Do you usually travel in that cabin class, or is it specific to this trip?',
+            'If I find a good deal in a higher cabin, would you be open to considering it?'
           ]),
           inputs: [
             {
@@ -447,9 +447,9 @@ const businessTicketsScript: Script = {
           label: 'Airline likes and dislikes',
           tags: ['Airline', 'Preferences'],
           variants: variants([
-            'Any airlines you love or want us to avoid?',
-            'Who gets your loyalty—and who’s on the no-fly list?',
-            'Are there carriers that feel like a perfect fit or a hard pass?'
+            'Do you have any airline preferences or airlines you prefer to avoid?',
+            'Are there carriers you would like me to prioritize or skip?',
+            'Any airlines you’ve had great or poor experiences with that I should note?'
           ]),
           inputs: [
             { id: 'preferred_airlines', label: 'Preferred airlines', type: 'tags', placeholder: 'Add preferred carriers' },
@@ -462,9 +462,9 @@ const businessTicketsScript: Script = {
           label: 'Route or carrier experience',
           tags: ['Airline'],
           variants: variants([
-            'Have you flown this route or airline before? How was it?',
-            'What worked—or didn’t—the last time you flew something similar?',
-            'Any past trips on this corridor that set expectations?'
+            'Have you flown with this airline or on this route before? What was the experience like?',
+            'Have you traveled to this destination previously, and how did it go?',
+            'Any previous experiences on this route or carrier that I should keep in mind?'
           ]),
           inputs: [
             { id: 'route_experience', label: 'Prior experience notes', type: 'longText', placeholder: 'Highlights, misses, lessons learned' }
@@ -475,9 +475,9 @@ const businessTicketsScript: Script = {
           label: 'Loyalty & miles',
           tags: ['Loyalty'],
           variants: variants([
-            'Is banking miles or status part of the goal here?',
-            'How important is it that this earns with a specific program?',
-            'Which mileage programs matter most for you?'
+            'Is it important for you to earn frequent flyer miles on this trip?',
+            'Which mileage accounts do you have, and do you need this trip to credit to them?',
+            'If we find a better fare on another airline, could you forego the miles?'
           ]),
           inputs: [
             { id: 'miles_important', label: 'Miles matter for this trip', type: 'checkbox' },
@@ -501,9 +501,9 @@ const businessTicketsScript: Script = {
           label: 'Stops & timing guardrails',
           tags: ['Stops', 'Timing'],
           variants: variants([
-            'How many stops max feel comfortable?',
-            'What’s the sweet spot for layovers and total travel time?',
-            'Any hard limits on connections or time in the air?'
+            'How many stops are you comfortable with if the fare is right?',
+            'What is the shortest and longest layover you would consider?',
+            'What is the maximum total travel time you would accept?'
           ]),
           inputs: [
             {
@@ -526,9 +526,9 @@ const businessTicketsScript: Script = {
           label: 'Tradeoffs',
           tags: ['Tradeoffs', 'Objection'],
           variants: variants([
-            'Would you mix cabins on short hops if it saves a bundle?',
-            'Open to creative ticketing—like separate tickets—if it beats published fares?',
-            'How flexible are you with cabins or ticketing if value is great?'
+            'Would it work if some shorter legs were in a lower cabin to save on the fare?',
+            'Would you consider separate tickets—even if it means rechecking bags—if it lowered the price?',
+            'Are mixed cabins or separate tickets acceptable when they provide better value?'
           ]),
           inputs: [
             { id: 'mixed_cabin_ok', label: 'Okay with mixed-cabin itineraries', type: 'checkbox' },
@@ -541,9 +541,9 @@ const businessTicketsScript: Script = {
           label: 'Specific preferences',
           tags: ['Preferences'],
           variants: variants([
-            'Any must-haves or hard avoids I should know upfront?',
-            'Are there times, airports, or routings that are non-negotiable?',
-            'What absolutely needs to happen—or never happen—on this trip?'
+            'Do you have any specific requests or things I should note while building options?',
+            'Are there any departure or arrival times, routes, or other details you want me to prioritize?',
+            'Is there anything you want to avoid during the trip that I should capture?'
           ]),
           inputs: [
             { id: 'must_haves', label: 'Must-haves / avoids', type: 'longText', placeholder: 'Note timing, routing, or service preferences' }
@@ -554,9 +554,9 @@ const businessTicketsScript: Script = {
           label: 'How to present options',
           tags: ['Presentation'],
           variants: variants([
-            'When I send options, do you want the full nerdy breakdown or just highlights?',
-            'Should I include aircraft, seat maps, lounges—or keep it high-level?',
-            'How detailed do you like proposal emails to be?'
+            'When I present the options, beyond the itinerary and price, would you like details like aircraft, seats, lounges, or service quality?',
+            'Do you prefer a detailed breakdown of features such as cabin type, reputation, and amenities, or just the essentials?',
+            'Should I include information about aircraft models, seat types, lounges, and other features when I review the options with you?'
           ]),
           inputs: [
             { id: 'want_details', label: 'Wants detailed breakdown', type: 'checkbox' },
@@ -587,9 +587,9 @@ const businessTicketsScript: Script = {
           label: 'Market intel',
           tags: ['Market', 'Next'],
           variants: variants([
-            'Have you seen any quotes yet? What’s the best so far?',
-            'Any offers you’re already considering that I should beat?',
-            'What’s the top option you’ve seen and where did it come from?'
+            'Do you have any current offers you’d like to compare with ours?',
+            'Have you researched other travel sites yet, and what was the best deal you found?',
+            'What’s the best fare you’ve seen so far, and where did you see it?'
           ]),
           inputs: [
             { id: 'best_price_seen', label: 'Best price seen', type: 'shortText', placeholder: 'e.g., $4,200 RT' },
@@ -602,9 +602,9 @@ const businessTicketsScript: Script = {
           label: 'Budget range',
           tags: ['Budget', 'Req'],
           variants: variants([
-            'Give me a range so I can curate instead of spam—what feels right?',
-            'What’s the investment window you’re comfortable with?',
-            'If we keep it in a certain budget lane, what does that look like?'
+            'We work with discounted private fares—what budget range should I target for this trip?',
+            'To focus my search, what price range would you be comfortable with?',
+            'Would a budget of $___ to $___ work for you, or do you have a specific number in mind?'
           ]),
           inputs: [
             { id: 'min_budget', label: 'Target low end', type: 'currency', placeholder: 'Minimum budget' },
@@ -617,9 +617,9 @@ const businessTicketsScript: Script = {
           label: 'Booking timing',
           tags: ['Timing', 'Next'],
           variants: variants([
-            'When are you hoping to wrap this up? Seats move as inventory shifts.',
-            'What’s the decision window so I can work backward?',
-            'When do you picture pulling the trigger if we find the right fit?'
+            'When are you planning to make the booking? Seats do get more expensive as availability drops.',
+            'How soon would you like to finalize the booking so I can pace the search appropriately?',
+            'What timeline are you working with to confirm the flights?'
           ]),
           inputs: [
             {
@@ -648,9 +648,9 @@ const businessTicketsScript: Script = {
           label: 'Passenger names',
           tags: ['Passengers'],
           variants: variants([
-            'Can you give me the full passport names, even if rough now?',
-            'Let’s list out the traveler names exactly as they appear on IDs.',
-            'Mind sharing a quick roster with exact spellings?'
+            'Could you provide the passengers’ full names exactly as they appear on the passports?',
+            'Please share each traveler’s full passport name so I can lock in the right fares.',
+            'May I have the exact spelling of each passenger’s name as per the passport?'
           ]),
           inputs: [
             { id: 'names_raw', label: 'Names as on passport', type: 'longText', placeholder: 'List each traveler' }
@@ -661,9 +661,9 @@ const businessTicketsScript: Script = {
           label: 'Best contacts',
           tags: ['Contacts'],
           variants: variants([
-            'What email and phone should I keep updated?',
-            'Where do you want itinerary drafts and alerts to land?',
-            'Share the best email/phone—and if SMS updates are welcome.'
+            'What is the best email address and phone number to reach you for updates?',
+            'Could you confirm the best email and phone for follow-ups, and if text messages are okay?',
+            'Where should I send the itinerary options, and is the provided phone number good for calls and texts?'
           ]),
           inputs: [
             { id: 'contact_email', label: 'Primary email', type: 'email', placeholder: 'name@company.com' },
@@ -683,9 +683,9 @@ const businessTicketsScript: Script = {
           label: 'Recap',
           tags: ['Recap'],
           variants: variants([
-            'Let me replay what I captured—anything I missed?',
-            'Here’s the quick summary—does that line up with your priorities?',
-            'Before we break, did I nail the essentials in my recap?'
+            'Let me quickly recap the key details to ensure I have everything correct.',
+            'I’ll summarize what we discussed—please let me know if I missed anything.',
+            'I’d like to review the travel details and preferences with you—does that all sound right?'
           ]),
           inputs: [
             { id: 'recap', label: 'Recap notes', type: 'longText', placeholder: 'Key takeaways for follow-up' }
@@ -696,9 +696,9 @@ const businessTicketsScript: Script = {
           label: 'Next step & follow-up',
           tags: ['Next'],
           variants: variants([
-            'I’ll scout fares and circle back—what time works for an update?',
-            'Let me research private fares and ping you—when should I check in?',
-            'I’ll pull options in the next hour or so—good time to reconnect?'
+            'I’ll research the best private fares and call you back in about an hour—will you be available then?',
+            'The search is manual, so I’ll get to work and follow up shortly—what time should I call you back?',
+            'I’ll send over our company information and reconnect after I’ve gathered options—when is the best time to reach you?'
           ]),
           inputs: [
             { id: 'callback_time', label: 'Callback target time', type: 'time' },
