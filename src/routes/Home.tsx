@@ -1,15 +1,17 @@
 import { useContext, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { PlusIcon, SparklesIcon, DocumentDuplicateIcon, TrashIcon } from '@heroicons/react/24/outline'
+import { PlusIcon, SparklesIcon, DocumentDuplicateIcon, TrashIcon, WrenchScrewdriverIcon } from '@heroicons/react/24/outline'
 import { StoreContext } from '../App'
 import { strings } from '../lib/i18n'
 import TemplatePickerDialog from '../components/TemplatePickerDialog'
+import TemplateManager from '../components/TemplateManager'
 
 export default function Home() {
   const store = useContext(StoreContext)!
   const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
   const [isTemplateDialogOpen, setTemplateDialogOpen] = useState(false)
+  const [isTemplateManagerOpen, setTemplateManagerOpen] = useState(false)
 
   const filtered = useMemo(() => {
     const term = searchTerm.toLowerCase()
@@ -38,6 +40,15 @@ export default function Home() {
           >
             <PlusIcon className="h-5 w-5" />
             {strings.createProject}
+          </button>
+          <button
+            type="button"
+            onClick={() => setTemplateManagerOpen(true)}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-300/70 bg-white/80 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:border-slate-400 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-200 sm:w-auto"
+            aria-label="Manage templates"
+          >
+            <WrenchScrewdriverIcon className="h-5 w-5" />
+            Manage templates
           </button>
         </div>
       </div>
@@ -121,6 +132,7 @@ export default function Home() {
           }
         }}
       />
+      <TemplateManager open={isTemplateManagerOpen} onClose={() => setTemplateManagerOpen(false)} />
     </div>
   )
 }

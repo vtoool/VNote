@@ -166,8 +166,8 @@ export default function CanvasRoute() {
           onClose={() => setCallModeOpen(false)}
         />
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-          <div className="space-y-4">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start lg:min-h-[calc(100vh-8rem)]">
+          <div className="flex flex-col gap-4 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:pr-4">
             <div className="flex flex-wrap gap-2">
               <button onClick={() => addCard('sticky')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">New sticky</button>
               <button onClick={() => addCard('checklist')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">Checklist</button>
@@ -175,7 +175,7 @@ export default function CanvasRoute() {
               <button onClick={() => addCard('media')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">Media</button>
               <button onClick={() => addCard('text')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">Text</button>
             </div>
-            <div className="lg:sticky lg:top-24">
+            <div className="min-h-[60vh]">
               <CanvasBoard
                 canvas={workingCanvas}
                 onChange={updateCanvas}
@@ -197,11 +197,11 @@ export default function CanvasRoute() {
               }} />
             </div>
           </div>
-          <div className="space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-2">
+          <aside className="space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:pr-2" role="complementary" aria-label="Guided conversation tools">
             <ScriptPanel project={project} onCaptureAnswer={handleCaptureAnswer} />
             <PersonalBullets bullets={project.personalBullets} />
             <HelpShortcuts />
-          </div>
+          </aside>
         </div>
       )}
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onImport={handleImport} />
