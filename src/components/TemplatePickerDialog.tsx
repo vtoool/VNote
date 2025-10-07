@@ -18,8 +18,8 @@ export default function TemplatePickerDialog({ open, templates, onClose, onSelec
         if (event.target === event.currentTarget) onClose()
       }}
     >
-      <div className="relative mx-auto flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-white/20 bg-white/95 shadow-glow dark:border-slate-800/60 dark:bg-slate-900/95">
-        <div className="flex items-center justify-between border-b border-white/40 px-5 py-4 dark:border-slate-800/60">
+      <div className="relative mx-auto flex h-full w-full max-w-4xl flex-col rounded-3xl border border-white/20 bg-white/95 shadow-glow dark:border-slate-800/60 dark:bg-slate-900/95">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/40 bg-white/95 px-5 py-4 dark:border-slate-800/60 dark:bg-slate-900/95">
           <div className="pr-6">
             <h2 className="text-lg font-semibold text-slate-800 dark:text-white sm:text-2xl">Choose a template</h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
@@ -66,6 +66,14 @@ export default function TemplatePickerDialog({ open, templates, onClose, onSelec
                 </span>
               </button>
             ))}
+          </div>
+          <div className="mt-6 flex justify-center">
+            <button
+              onClick={onClose}
+              className="inline-flex items-center rounded-full border border-slate-300/70 bg-white/80 px-5 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:border-slate-700/70 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:border-slate-600"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       </div>
