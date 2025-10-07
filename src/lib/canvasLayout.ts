@@ -16,7 +16,9 @@ interface Positionable {
   y: number
 }
 
-export function findNextGridPosition<T extends Positionable>(cards: T[]): { x: number; y: number } {
+export function findNextGridPositionWithOverflow<T extends Positionable>(
+  cards: T[]
+): { position: { x: number; y: number }; overflowed: boolean } {
   const occupied = new Set(
     cards.map((card) => {
       const snapped = snapPointToGrid({ x: card.x, y: card.y })
@@ -30,7 +32,10 @@ export function findNextGridPosition<T extends Positionable>(cards: T[]): { x: n
     for (let col = 0; col < searchLimit; col += 1) {
       const key = `${col}:${row}`
       if (!occupied.has(key)) {
-        return { x: col * GRID_SPACING, y: row * GRID_SPACING }
+        return {
+          position: { x: col * GRID_SPACING, y: row * GRID_SPACING },
+          overflowed: false
+        }
       }
     }
   }
@@ -38,5 +43,12 @@ export function findNextGridPosition<T extends Positionable>(cards: T[]): { x: n
   const fallbackIndex = cards.length + 1
   const fallbackRow = Math.floor(fallbackIndex / searchLimit)
   const fallbackCol = fallbackIndex % searchLimit
-  return { x: fallbackCol * GRID_SPACING, y: fallbackRow * GRID_SPACING }
+  return {
+    position: { x: fallbackCol * GRID_SPACING, y: fallbackRow * GRID_SPACING },
+    overflowed: true
+  }
+}
+
+export function findNextGridPosition<T extends Positionable>(cards: T[]): { x: number; y: number } {
+  return findNextGridPositionWithOverflow(cards).position
 }
