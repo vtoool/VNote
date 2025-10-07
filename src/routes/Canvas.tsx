@@ -16,6 +16,7 @@ import {
   ScriptQuestion,
   QuestionVariant
 } from '../lib/storage'
+import { findNextGridPosition } from '../lib/canvasLayout'
 import { createId } from '../lib/id'
 import CallModePanel from '../components/CallModePanel'
 import { createQuestionCard } from '../lib/questions'
@@ -94,6 +95,7 @@ export default function CanvasRoute() {
 
   const addCard = (type: Card['type']) => {
     const now = new Date().toISOString()
+    const position = findNextGridPosition(workingCanvas.cards)
     const base = {
       id: createId('card'),
       title: 'New card',
@@ -103,10 +105,8 @@ export default function CanvasRoute() {
       locked: false,
       color: '#f8fafc',
       priority: 'medium' as const,
-      x: Math.random() * 160,
-      y: Math.random() * 160,
-      width: 240,
-      height: 200,
+      x: position.x,
+      y: position.y,
       createdAt: now,
       updatedAt: now
     }
@@ -141,7 +141,8 @@ export default function CanvasRoute() {
   }
 
   const handleCaptureAnswer = (question: ScriptQuestion, variant: QuestionVariant) => {
-    const card: Card = createQuestionCard({ question, variant })
+    const position = findNextGridPosition(workingCanvas.cards)
+    const card: Card = createQuestionCard({ question, variant, position })
     updateCanvas({ ...workingCanvas, cards: [card, ...workingCanvas.cards] })
   }
 
