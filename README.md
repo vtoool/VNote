@@ -54,7 +54,7 @@ The included workflow in `.github/workflows/deploy.yml` builds the app and publi
 
 ### Try your Gemini API key
 
-Head to the **Settings** page from the sidebar to find the Gemini API tester card. Paste a valid API key, enter a prompt, and send a test request to confirm your credentials. The call is made straight from your browser using the official REST endpoint, so avoid sharing keys you would not be comfortable exposing client-side. If you prefer to bundle a throwaway key for local testing, update `DEFAULT_GEMINI_API_KEY` in `src/config/gemini.ts`—the tester will pre-fill the input with that value.
+Head to the **Settings** page from the sidebar to find the Gemini API tester card. Enter a prompt and hit **Send test prompt**—the tester ships with a bundled credential so it immediately talks to the live Gemini API without asking you for a key. If you rotate the key, update `DEFAULT_GEMINI_API_KEY` in `src/config/gemini.ts`.
 
 ## Future roadmap
 
