@@ -25,7 +25,7 @@ def main() -> None:
 
     # Replace the placeholder below with your actual Gemini API key before running
     # this script.
-    api_key = "YOUR_GEMINI_API_KEY"
+    api_key = "AIzaSyCNhEJt6wbopVGULGiuYmbPsXWh9DSBHOc"
 
     # Initialize the client. Passing the key explicitly makes it clear which
     # credentials are being used.
