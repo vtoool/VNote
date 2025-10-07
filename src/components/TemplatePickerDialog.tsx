@@ -13,12 +13,12 @@ export default function TemplatePickerDialog({ open, templates, onClose, onSelec
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4 py-6 backdrop-blur"
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 px-4 py-6 backdrop-blur sm:flex sm:items-center sm:justify-center"
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose()
       }}
     >
-      <div className="relative flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-white/20 bg-white/95 shadow-glow dark:border-slate-800/60 dark:bg-slate-900/95">
+      <div className="relative mx-auto flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-white/20 bg-white/95 shadow-glow dark:border-slate-800/60 dark:bg-slate-900/95">
         <div className="flex items-center justify-between border-b border-white/40 px-5 py-4 dark:border-slate-800/60">
           <div className="pr-6">
             <h2 className="text-lg font-semibold text-slate-800 dark:text-white sm:text-2xl">Choose a template</h2>
