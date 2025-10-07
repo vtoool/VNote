@@ -33,10 +33,45 @@ export interface ChecklistCard extends BaseCard {
   checklist: ChecklistItem[]
 }
 
+export type InputType =
+  | 'shortText'
+  | 'longText'
+  | 'select'
+  | 'multiSelect'
+  | 'number'
+  | 'date'
+  | 'time'
+  | 'checkbox'
+  | 'tags'
+  | 'currency'
+  | 'email'
+  | 'phone'
+
+export interface ScriptInputOption {
+  value: string
+  label: string
+}
+
+export type FieldValue = string | number | boolean | string[] | null
+
+export interface ScriptInput {
+  id: string
+  label: string
+  type: InputType
+  placeholder?: string
+  description?: string
+  options?: ScriptInputOption[]
+  defaultValue?: FieldValue
+}
+
 export interface QuestionVariant {
   id: string
   text: string
   tone: 'warm' | 'direct' | 'curious'
+}
+
+export interface QuestionFieldState extends ScriptInput {
+  value: FieldValue
 }
 
 export interface QuestionCard extends BaseCard {
@@ -44,6 +79,8 @@ export interface QuestionCard extends BaseCard {
   answer: string
   variants: QuestionVariant[]
   tags: string[]
+  questionId?: string
+  fields?: QuestionFieldState[]
 }
 
 export interface StickyCard extends BaseCard {
@@ -91,6 +128,7 @@ export interface ScriptQuestion {
   variants: QuestionVariant[]
   tags: string[]
   timeboxSeconds?: number
+  inputs?: ScriptInput[]
   branch?: {
     whenTag: string
     nextSectionId: string
@@ -110,12 +148,22 @@ export interface Script {
   sections: ScriptSection[]
 }
 
+export interface TemplateCardSeed {
+  type: CardType
+  title: string
+  content?: string
+  tags?: string[]
+  checklistItems?: string[]
+  color?: string
+}
+
 export interface Template {
   id: string
   name: string
   description: string
   script: Script
   personalBullets: string[]
+  defaultCards?: TemplateCardSeed[]
 }
 
 export interface VersionEntry {
@@ -190,9 +238,50 @@ export function createEmptyCanvas(name = 'New Canvas'): Canvas {
   }
 }
 
+function createCardFromSeed(seed: TemplateCardSeed): Card {
+  const now = new Date().toISOString()
+  const base = {
+    id: createId('card'),
+    title: seed.title,
+    content: seed.content ?? '',
+    tags: seed.tags ?? [],
+    pinned: false,
+    locked: false,
+    color: seed.color ?? '#f8fafc',
+    priority: 'medium' as const,
+    x: Math.random() * 120,
+    y: Math.random() * 120,
+    width: 260,
+    height: 240,
+    createdAt: now,
+    updatedAt: now
+  }
+
+  switch (seed.type) {
+    case 'checklist':
+      return {
+        ...base,
+        type: 'checklist',
+        checklist:
+          seed.checklistItems?.map((text) => ({ id: createId('item'), text, completed: false })) ?? []
+      }
+    case 'question':
+      return { ...base, type: 'question', answer: '', variants: [], tags: base.tags }
+    case 'media':
+      return { ...base, type: 'media', dataUrl: null, description: '' }
+    case 'text':
+      return { ...base, type: 'text', markdown: true }
+    default:
+      return { ...base, type: 'sticky' }
+  }
+}
+
 export function createProjectFromTemplate(template: Template): Project {
   const now = new Date().toISOString()
   const initialCanvas = createEmptyCanvas('Discovery Notes')
+  if (template.defaultCards?.length) {
+    initialCanvas.cards = template.defaultCards.map((seed) => createCardFromSeed(seed))
+  }
   return {
     id: createId('project'),
     name: template.name,

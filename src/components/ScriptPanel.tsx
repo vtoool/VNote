@@ -1,8 +1,8 @@
-import { Project } from '../lib/storage'
+import { Project, QuestionVariant, ScriptQuestion } from '../lib/storage'
 
 interface ScriptPanelProps {
   project: Project
-  onCaptureAnswer: (questionId: string, variantText: string) => void
+  onCaptureAnswer: (question: ScriptQuestion, variant: QuestionVariant) => void
 }
 
 export default function ScriptPanel({ project, onCaptureAnswer }: ScriptPanelProps) {
@@ -18,17 +18,45 @@ export default function ScriptPanel({ project, onCaptureAnswer }: ScriptPanelPro
           <ul className="mt-3 space-y-2">
             {section.questions.map((question) => (
               <li key={question.id} className="rounded-2xl bg-white/80 p-3 shadow-sm dark:bg-slate-900/60">
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-100">{question.label}</p>
-                <div className="mt-2 space-y-2">
-                  {question.variants.map((variant) => (
-                    <button
-                      key={variant.id}
-                      onClick={() => onCaptureAnswer(question.id, variant.text)}
-                      className="w-full rounded-2xl bg-indigo-500/10 px-3 py-2 text-left text-xs text-indigo-600 transition hover:bg-indigo-500/20 dark:text-indigo-200"
-                    >
-                      ✨ {variant.text}
-                    </button>
-                  ))}
+                <div className="flex flex-col gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-100">{question.label}</p>
+                    {question.tags.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1 text-[10px] uppercase tracking-wide text-indigo-500 dark:text-indigo-200">
+                        {question.tags.map((tag) => (
+                          <span key={tag} className="rounded-full bg-indigo-500/10 px-2 py-0.5">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {question.inputs?.length ? (
+                    <div className="rounded-2xl border border-indigo-200/40 bg-indigo-50/40 p-2 text-[10px] text-slate-600 dark:border-indigo-500/40 dark:bg-slate-900/40 dark:text-slate-300">
+                      <p className="font-semibold text-indigo-600 dark:text-indigo-200">Structured capture:</p>
+                      <ul className="mt-1 space-y-1">
+                        {question.inputs.map((input) => (
+                          <li key={input.id} className="flex items-center justify-between gap-2">
+                            <span>{input.label}</span>
+                            <span className="rounded-full bg-white/70 px-2 py-0.5 text-[9px] uppercase tracking-wide text-indigo-500 dark:bg-slate-800/60 dark:text-indigo-200">
+                              {input.type}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  <div className="space-y-2">
+                    {question.variants.map((variant) => (
+                      <button
+                        key={variant.id}
+                        onClick={() => onCaptureAnswer(question, variant)}
+                        className="w-full rounded-2xl bg-indigo-500/10 px-3 py-2 text-left text-xs text-indigo-600 transition hover:bg-indigo-500/20 dark:text-indigo-200"
+                      >
+                        ✨ {variant.text}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </li>
             ))}
