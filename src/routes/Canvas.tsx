@@ -199,12 +199,14 @@ export default function CanvasRoute() {
             <button onClick={() => addCard('media')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">Media</button>
             <button onClick={() => addCard('text')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">Text</button>
           </div>
-          <CanvasBoard
-            canvas={workingCanvas}
-            onChange={updateCanvas}
-            onCardChange={updateCard}
-            onCardDelete={deleteCard}
-          />
+          <div className="lg:sticky lg:top-24">
+            <CanvasBoard
+              canvas={workingCanvas}
+              onChange={updateCanvas}
+              onCardChange={updateCard}
+              onCardDelete={deleteCard}
+            />
+          </div>
           <div className="grid gap-4 md:grid-cols-2">
             <ObjectionsLog cards={workingCanvas.cards} />
             <MutualActionPlan onExport={(items) => {
@@ -219,7 +221,7 @@ export default function CanvasRoute() {
             }} />
           </div>
         </div>
-        <div className="space-y-4">
+        <div className="space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-2">
           <ScriptPanel project={project} onCaptureAnswer={handleCaptureAnswer} />
           <PersonalBullets bullets={project.personalBullets} />
           <HelpShortcuts />
