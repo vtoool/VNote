@@ -1,6 +1,6 @@
 import { createContext, useEffect, useMemo, useState } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
-import { CommandLineIcon } from '@heroicons/react/24/outline'
+import { CommandLineIcon, MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useLocalStore } from './hooks/useLocalStore'
 import { applyTheme, loadTheme, saveTheme, ThemeState } from './lib/theme'
 import { exportProjectToJson, exportProjectToText } from './lib/export'
@@ -23,22 +23,78 @@ export const StoreContext = createContext<StoreContextValue | null>(null)
 
 function Header({ onOpenCommand }: { onOpenCommand: () => void }) {
   const navigate = useNavigate()
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
+
+  useEffect(() => {
+    if (!mobileSearchOpen) return
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMobileSearchOpen(false)
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [mobileSearchOpen])
+
   return (
-    <header className="glass-panel sticky top-4 z-40 mx-auto flex w-full max-w-5xl items-center gap-3 px-5 py-3">
-      <button
-        onClick={() => navigate('/')}
-        className="rounded-2xl bg-slate-900/5 px-3 py-1 text-sm font-semibold text-slate-700 dark:text-slate-100"
-      >
-        {strings.appTitle}
-      </button>
-      <SearchBar />
-      <button
-        onClick={onOpenCommand}
-        className="ml-auto inline-flex items-center gap-2 rounded-2xl bg-indigo-500/10 px-3 py-2 text-sm font-medium text-indigo-600 hover:bg-indigo-500/20 dark:text-indigo-200"
-      >
-        <CommandLineIcon className="h-4 w-4" />
-        Cmd / Ctrl + K
-      </button>
+    <header className="glass-panel sticky top-4 z-40 mx-auto flex w-full max-w-5xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:gap-4 sm:px-5">
+      <div className="flex w-full items-center gap-2">
+        <button
+          onClick={() => navigate('/')}
+          className="rounded-2xl bg-slate-900/5 px-3 py-1 text-sm font-semibold text-slate-700 transition hover:bg-slate-900/10 dark:bg-white/10 dark:text-slate-100"
+        >
+          {strings.appTitle}
+        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setMobileSearchOpen(true)}
+            className="inline-flex items-center justify-center rounded-2xl bg-slate-900/5 p-2 text-slate-600 transition hover:bg-slate-900/10 dark:bg-white/10 dark:text-slate-200 sm:hidden"
+            aria-label="Open search"
+          >
+            <MagnifyingGlassIcon className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            onClick={onOpenCommand}
+            className="inline-flex items-center gap-2 rounded-2xl bg-indigo-500/10 px-3 py-2 text-sm font-medium text-indigo-600 transition hover:bg-indigo-500/20 dark:text-indigo-200"
+            aria-label="Open command palette"
+          >
+            <CommandLineIcon className="h-4 w-4" />
+            <span className="hidden sm:inline">Cmd / Ctrl + K</span>
+          </button>
+        </div>
+      </div>
+      <div className="hidden w-full sm:block">
+        <SearchBar />
+      </div>
+
+      {mobileSearchOpen && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col gap-4 bg-slate-900/80 px-4 py-16 backdrop-blur-sm sm:hidden"
+          onClick={() => setMobileSearchOpen(false)}
+        >
+          <div
+            className="glass-panel mx-auto w-full max-w-lg rounded-3xl p-4"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center gap-2">
+              <SearchBar
+                autoFocus
+                containerClassName="max-w-none"
+                inputClassName="py-3 text-base"
+                onNavigate={() => setMobileSearchOpen(false)}
+              />
+              <button
+                type="button"
+                onClick={() => setMobileSearchOpen(false)}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900/5 text-slate-600 transition hover:bg-slate-900/10 dark:bg-white/10 dark:text-slate-200"
+                aria-label="Close search"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   )
 }

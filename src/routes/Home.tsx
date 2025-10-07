@@ -21,20 +21,20 @@ export default function Home() {
   }, [searchTerm, store.projects])
 
   return (
-    <div className="space-y-6">
-      <div className="glass-panel flex flex-wrap items-center gap-4 p-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-800 dark:text-white">{strings.projectsTitle}</h1>
+    <div className="space-y-5 sm:space-y-6">
+      <div className="glass-panel flex flex-col gap-4 p-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4 sm:p-6">
+        <div className="space-y-1">
+          <h1 className="text-xl font-semibold text-slate-800 dark:text-white sm:text-2xl">{strings.projectsTitle}</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             Guided, human-first notes for your high-impact conversations.
           </p>
         </div>
-        <div className="ml-auto flex flex-wrap items-center gap-3">
+        <div className="flex flex-1 items-center justify-end gap-3 sm:flex-none">
           <button
             onClick={() => {
               setTemplateDialogOpen(true)
             }}
-            className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-500 px-4 py-2 text-sm font-semibold text-white shadow-soft hover:shadow-glow"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 to-violet-500 px-4 py-2 text-sm font-semibold text-white shadow-soft transition hover:shadow-glow sm:w-auto"
           >
             <PlusIcon className="h-5 w-5" />
             {strings.createProject}
@@ -42,7 +42,7 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="glass-panel p-6">
+      <div className="glass-panel p-4 sm:p-6">
         <input
           value={searchTerm}
           onChange={(event) => setSearchTerm(event.target.value)}
@@ -50,7 +50,7 @@ export default function Home() {
           className="mb-4 w-full rounded-2xl border border-slate-200/60 bg-white/70 px-4 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:border-slate-700/50 dark:bg-slate-900/70"
         />
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center space-y-3 rounded-3xl border border-dashed border-indigo-300/50 bg-indigo-50/40 p-12 text-center dark:border-indigo-500/40 dark:bg-slate-800/40">
+          <div className="flex flex-col items-center justify-center space-y-3 rounded-3xl border border-dashed border-indigo-300/50 bg-indigo-50/40 p-10 text-center text-sm dark:border-indigo-500/40 dark:bg-slate-800/40 sm:p-12 sm:text-base">
             <SparklesIcon className="h-10 w-10 text-indigo-500" />
             <p className="text-lg font-semibold text-slate-700 dark:text-slate-100">{strings.emptyProjects}</p>
           </div>
@@ -59,19 +59,19 @@ export default function Home() {
             {filtered.map((project) => (
               <article
                 key={project.id}
-                className="group flex flex-col rounded-3xl border border-white/60 bg-white/70 p-6 shadow-soft transition hover:-translate-y-1 hover:shadow-glow dark:border-slate-800/60 dark:bg-slate-900/70"
+                className="group flex flex-col rounded-3xl border border-white/60 bg-white/70 p-5 shadow-soft transition hover:-translate-y-1 hover:shadow-glow dark:border-slate-800/60 dark:bg-slate-900/70 sm:p-6"
               >
-                <header className="flex items-start justify-between gap-3">
-                  <div>
-                    <h2 className="text-xl font-semibold text-slate-800 dark:text-white">{project.name}</h2>
+                <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="space-y-1">
+                    <h2 className="text-lg font-semibold text-slate-800 dark:text-white sm:text-xl">{project.name}</h2>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
                       Updated {new Date(project.updatedAt).toLocaleString()}
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2 sm:flex-nowrap">
                     <button
                       onClick={() => navigate(`/project/${project.id}`)}
-                      className="rounded-2xl bg-indigo-500/10 px-3 py-2 text-xs font-semibold text-indigo-600 hover:bg-indigo-500/20 dark:text-indigo-200"
+                      className="rounded-2xl bg-indigo-500/10 px-3 py-2 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-500/20 dark:text-indigo-200"
                     >
                       Open
                     </button>
