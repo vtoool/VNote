@@ -4,6 +4,7 @@ import { PlusIcon, ArrowLeftIcon } from '@heroicons/react/24/outline'
 import { StoreContext } from '../App'
 import { strings } from '../lib/i18n'
 import { createEmptyCanvas } from '../lib/storage'
+import { createQuestionCard } from '../lib/questions'
 
 export default function ProjectRoute() {
   const { projectId } = useParams()
@@ -34,8 +35,8 @@ export default function ProjectRoute() {
   return (
     <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
       <section className="glass-panel space-y-6 p-6">
-        <header className="flex items-start justify-between gap-4">
-          <div>
+        <header className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex-1">
             <input
               value={renameValue}
               onChange={(event) => setRenameValue(event.target.value)}
@@ -46,14 +47,24 @@ export default function ProjectRoute() {
               {project.tags.length > 0 ? project.tags.join(' • ') : 'Add tags via card quick tags.'}
             </p>
           </div>
-          <button
-            onClick={() => {
-              store.saveSnapshot(project.id, 'Manual save')
-            }}
-            className="rounded-2xl bg-indigo-500/10 px-3 py-2 text-xs font-semibold text-indigo-600 hover:bg-indigo-500/20 dark:text-indigo-200"
-          >
-            {strings.actionSave}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {project.canvases[0] && (
+              <button
+                onClick={() => navigate(`/project/${project.id}/canvas/${project.canvases[0].id}`, { state: { callMode: true } })}
+                className="rounded-2xl bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-600 transition hover:bg-emerald-500/20 dark:text-emerald-200"
+              >
+                Start call mode
+              </button>
+            )}
+            <button
+              onClick={() => {
+                store.saveSnapshot(project.id, 'Manual save')
+              }}
+              className="rounded-2xl bg-indigo-500/10 px-3 py-2 text-xs font-semibold text-indigo-600 hover:bg-indigo-500/20 dark:text-indigo-200"
+            >
+              {strings.actionSave}
+            </button>
+          </div>
         </header>
 
         <div className="rounded-3xl border border-slate-200/60 bg-white/70 p-4 dark:border-slate-700/60 dark:bg-slate-900/70">
@@ -178,25 +189,8 @@ export default function ProjectRoute() {
                             onClick={() => {
                               if (!project.canvases[0]) return
                               const canvas = project.canvases[0]
-                              store.addCard(project.id, canvas.id, {
-                                id: variant.id,
-                                type: 'question',
-                                title: question.label,
-                                content: variant.text,
-                                tags: question.tags,
-                                pinned: false,
-                                locked: false,
-                                color: '#e0e7ff',
-                                priority: 'medium',
-                                x: Math.random() * 100,
-                                y: Math.random() * 100,
-                                width: 260,
-                                height: 200,
-                                createdAt: new Date().toISOString(),
-                                updatedAt: new Date().toISOString(),
-                                answer: '',
-                                variants: question.variants,
-                              })
+                              const card = createQuestionCard({ question, variant })
+                              store.addCard(project.id, canvas.id, card)
                             }}
                             className="block w-full rounded-2xl bg-indigo-500/10 px-3 py-2 text-left text-xs text-indigo-600 transition hover:bg-indigo-500/20 dark:text-indigo-200"
                           >

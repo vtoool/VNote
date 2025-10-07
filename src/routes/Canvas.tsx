@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { StoreContext } from '../App'
 import CanvasBoard from '../components/CanvasBoard'
 import Toolbar from '../components/Toolbar'
@@ -14,26 +14,35 @@ import {
   Card,
   Canvas as CanvasType,
   ScriptQuestion,
-  QuestionVariant,
-  QuestionFieldState,
-  ScriptInput,
-  FieldValue
+  QuestionVariant
 } from '../lib/storage'
 import { createId } from '../lib/id'
+import CallModePanel from '../components/CallModePanel'
+import { createQuestionCard } from '../lib/questions'
 
 export default function CanvasRoute() {
   const { projectId, canvasId } = useParams()
   const store = useContext(StoreContext)!
+  const location = useLocation()
+  const navigate = useNavigate()
   const project = store.projects.find((p) => p.id === projectId)
   const canvas = project?.canvases.find((c) => c.id === canvasId)
   const { value, set, replace, undo, redo } = useUndoRedo<CanvasType | undefined>(canvas)
   const [importOpen, setImportOpen] = useState(false)
+  const [callModeOpen, setCallModeOpen] = useState(false)
 
   useEffect(() => {
     if (canvas) {
       replace(canvas)
     }
   }, [canvas?.id])
+
+  useEffect(() => {
+    if (location.state && (location.state as any).callMode) {
+      setCallModeOpen(true)
+      navigate('.', { replace: true, state: {} })
+    }
+  }, [location.state, navigate])
 
   if (!project || !canvas) {
     return (
@@ -131,53 +140,8 @@ export default function CanvasRoute() {
     }))
   }
 
-  const initializeFieldValue = (input: ScriptInput): QuestionFieldState => {
-    let value: FieldValue
-    switch (input.type) {
-      case 'checkbox':
-        value = Boolean(input.defaultValue)
-        break
-      case 'multiSelect':
-      case 'tags':
-        value = Array.isArray(input.defaultValue) ? [...input.defaultValue] : []
-        break
-      case 'number':
-        value = typeof input.defaultValue === 'number' ? input.defaultValue : null
-        break
-      default:
-        value =
-          typeof input.defaultValue === 'string'
-            ? input.defaultValue
-            : input.defaultValue == null
-              ? ''
-              : String(input.defaultValue)
-    }
-    return { ...input, value }
-  }
-
   const handleCaptureAnswer = (question: ScriptQuestion, variant: QuestionVariant) => {
-    const now = new Date().toISOString()
-    const card: Card = {
-      id: createId('card'),
-      type: 'question',
-      title: question.label,
-      content: variant.text,
-      answer: '',
-      variants: question.variants.map((option) => ({ ...option })),
-      tags: Array.from(new Set(['question', ...question.tags.map((tag) => tag.toLowerCase())])),
-      questionId: question.id,
-      fields: question.inputs?.map((input) => initializeFieldValue(input)),
-      pinned: false,
-      locked: false,
-      color: '#e0e7ff',
-      priority: 'medium',
-      x: Math.random() * 120,
-      y: Math.random() * 120,
-      width: 260,
-      height: 200,
-      createdAt: now,
-      updatedAt: now
-    }
+    const card: Card = createQuestionCard({ question, variant })
     updateCanvas({ ...workingCanvas, cards: [card, ...workingCanvas.cards] })
   }
 
@@ -189,44 +153,57 @@ export default function CanvasRoute() {
         onExportJson={() => store.exportProject(project.id, 'json')}
         onExportText={() => store.exportProject(project.id, 'text')}
         onImport={() => setImportOpen(true)}
+        onToggleCallMode={() => setCallModeOpen((prev) => !prev)}
+        callModeActive={callModeOpen}
       />
-      <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-        <div className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            <button onClick={() => addCard('sticky')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">New sticky</button>
-            <button onClick={() => addCard('checklist')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">Checklist</button>
-            <button onClick={() => addCard('question')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">Question</button>
-            <button onClick={() => addCard('media')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">Media</button>
-            <button onClick={() => addCard('text')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">Text</button>
+      {callModeOpen ? (
+        <CallModePanel
+          project={project}
+          canvas={workingCanvas}
+          onCanvasChange={updateCanvas}
+          onCardChange={updateCard}
+          onCardDelete={deleteCard}
+          onClose={() => setCallModeOpen(false)}
+        />
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => addCard('sticky')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">New sticky</button>
+              <button onClick={() => addCard('checklist')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">Checklist</button>
+              <button onClick={() => addCard('question')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">Question</button>
+              <button onClick={() => addCard('media')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">Media</button>
+              <button onClick={() => addCard('text')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">Text</button>
+            </div>
+            <div className="lg:sticky lg:top-24">
+              <CanvasBoard
+                canvas={workingCanvas}
+                onChange={updateCanvas}
+                onCardChange={updateCard}
+                onCardDelete={deleteCard}
+              />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <ObjectionsLog cards={workingCanvas.cards} />
+              <MutualActionPlan onExport={(items) => {
+                const lines = items.map((item) => `${item.owner}: ${item.action} (${item.due})`).join('\n')
+                const blob = new Blob([lines], { type: 'text/plain;charset=utf-8' })
+                const url = URL.createObjectURL(blob)
+                const link = document.createElement('a')
+                link.href = url
+                link.download = `${project.name}-mutual-action-plan.txt`
+                link.click()
+                URL.revokeObjectURL(url)
+              }} />
+            </div>
           </div>
-          <div className="lg:sticky lg:top-24">
-            <CanvasBoard
-              canvas={workingCanvas}
-              onChange={updateCanvas}
-              onCardChange={updateCard}
-              onCardDelete={deleteCard}
-            />
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <ObjectionsLog cards={workingCanvas.cards} />
-            <MutualActionPlan onExport={(items) => {
-              const lines = items.map((item) => `${item.owner}: ${item.action} (${item.due})`).join('\n')
-              const blob = new Blob([lines], { type: 'text/plain;charset=utf-8' })
-              const url = URL.createObjectURL(blob)
-              const link = document.createElement('a')
-              link.href = url
-              link.download = `${project.name}-mutual-action-plan.txt`
-              link.click()
-              URL.revokeObjectURL(url)
-            }} />
+          <div className="space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-2">
+            <ScriptPanel project={project} onCaptureAnswer={handleCaptureAnswer} />
+            <PersonalBullets bullets={project.personalBullets} />
+            <HelpShortcuts />
           </div>
         </div>
-        <div className="space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-2">
-          <ScriptPanel project={project} onCaptureAnswer={handleCaptureAnswer} />
-          <PersonalBullets bullets={project.personalBullets} />
-          <HelpShortcuts />
-        </div>
-      </div>
+      )}
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onImport={handleImport} />
     </div>
   )

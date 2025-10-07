@@ -1,14 +1,13 @@
 import { useState } from 'react'
 import { Card, QuestionFieldState } from '../lib/storage'
 import { createId } from '../lib/id'
+import { quickTags } from '../lib/tags'
 
 interface CardProps {
   card: Card
   onChange: (card: Card) => void
   onDelete: () => void
 }
-
-const quickTags = ['pain', 'impact', 'req', 'objection', 'next']
 
 export default function CardComponent({ card, onChange, onDelete }: CardProps) {
   const [editingTitle, setEditingTitle] = useState(false)
@@ -190,7 +189,7 @@ export default function CardComponent({ card, onChange, onDelete }: CardProps) {
   }
 
   return (
-    <div className={baseClasses}>
+    <div className={baseClasses} data-card-root="true">
       <div className="mb-2 flex items-start justify-between">
         {editingTitle ? (
           <input

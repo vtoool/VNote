@@ -30,7 +30,11 @@ export default function CanvasBoard({ canvas, onChange, onCardChange, onCardDele
   } | null>(null)
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || event.target !== event.currentTarget) return
+    if (event.button !== 0) return
+    const target = event.target as HTMLElement | null
+    if (target && target.closest('[data-card-root="true"]')) {
+      return
+    }
     event.preventDefault()
     event.currentTarget.setPointerCapture(event.pointerId)
     setIsPanning(true)
@@ -65,6 +69,7 @@ export default function CanvasBoard({ canvas, onChange, onCardChange, onCardDele
 
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     event.preventDefault()
+    event.stopPropagation()
     const zoomIntensity = 0.0015
     const nextZoom = Math.min(
       MAX_ZOOM,
@@ -90,16 +95,16 @@ export default function CanvasBoard({ canvas, onChange, onCardChange, onCardDele
           {showGrid ? 'Hide grid' : 'Show grid'}
         </button>
         <button
-          onClick={() => onChange({ ...canvas, zoom: Math.min(canvas.zoom + 0.1, MAX_ZOOM) })}
-          className="rounded-2xl bg-white/70 px-3 py-1 text-xs text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/70 dark:text-slate-300"
-        >
-          +
-        </button>
-        <button
           onClick={() => onChange({ ...canvas, zoom: Math.max(canvas.zoom - 0.1, MIN_ZOOM) })}
           className="rounded-2xl bg-white/70 px-3 py-1 text-xs text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/70 dark:text-slate-300"
         >
           –
+        </button>
+        <button
+          onClick={() => onChange({ ...canvas, zoom: Math.min(canvas.zoom + 0.1, MAX_ZOOM) })}
+          className="rounded-2xl bg-white/70 px-3 py-1 text-xs text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/70 dark:text-slate-300"
+        >
+          +
         </button>
         <button
           onClick={() => onChange({ ...canvas, zoom: 1, position: { x: 0, y: 0 } })}
@@ -136,6 +141,7 @@ export default function CanvasBoard({ canvas, onChange, onCardChange, onCardDele
           {canvas.cards.map((card) => (
             <Rnd
               key={card.id}
+              data-card-root="true"
               position={{ x: card.x, y: card.y }}
               size={{ width: card.width, height: card.height }}
               onDragStop={(event, data) => {
