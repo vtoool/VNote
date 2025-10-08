@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from 'react'
+import { useContext, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { StoreContext } from '../App'
 import CanvasBoard from '../components/CanvasBoard'
@@ -19,6 +19,7 @@ import {
 import { findNextGridPosition } from '../lib/canvasLayout'
 import { createId } from '../lib/id'
 import CallModePanel from '../components/CallModePanel'
+import { SummarizeButton } from '../components/SummarizeButton'
 import { createQuestionCard } from '../lib/questions'
 
 export default function CanvasRoute() {
@@ -57,6 +58,30 @@ export default function CanvasRoute() {
   }
 
   const workingCanvas = value ?? canvas
+
+  const canvasText = useMemo(() => {
+    return workingCanvas.cards
+      .map((card) => {
+        switch (card.type) {
+          case 'checklist': {
+            const checklist = card.checklist
+              .map((item) => `- [${item.completed ? 'x' : ' '}] ${item.text}`)
+              .join('\n')
+            return [card.title, card.content, checklist].filter(Boolean).join('\n')
+          }
+          case 'question':
+            return [card.title, card.content, card.answer]
+              .filter(Boolean)
+              .join('\n')
+          case 'media':
+            return [card.title, card.content, card.description].filter(Boolean).join('\n')
+          default:
+            return [card.title, card.content].filter(Boolean).join('\n')
+        }
+      })
+      .filter(Boolean)
+      .join('\n\n')
+  }, [workingCanvas.cards])
 
   const updateCanvas = (next: CanvasType) => {
     set(next)
@@ -146,6 +171,28 @@ export default function CanvasRoute() {
     updateCanvas({ ...workingCanvas, cards: [card, ...workingCanvas.cards] })
   }
 
+  const handleSummaryResult = (summary: string) => {
+    const now = new Date().toISOString()
+    const position = findNextGridPosition(workingCanvas.cards)
+    const summaryCard: Card = {
+      id: createId('card'),
+      type: 'text',
+      title: 'AI Summary',
+      content: summary,
+      tags: ['ai', 'summary'],
+      pinned: false,
+      locked: false,
+      color: '#f8fafc',
+      priority: 'medium',
+      x: position.x,
+      y: position.y,
+      createdAt: now,
+      updatedAt: now,
+      markdown: false
+    }
+    updateCanvas({ ...workingCanvas, cards: [summaryCard, ...workingCanvas.cards] })
+  }
+
   return (
     <div className="space-y-6">
       <Toolbar
@@ -175,6 +222,9 @@ export default function CanvasRoute() {
               <button onClick={() => addCard('question')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">Question</button>
               <button onClick={() => addCard('media')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">Media</button>
               <button onClick={() => addCard('text')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">Text</button>
+            </div>
+            <div className="rounded-3xl border border-indigo-200/60 bg-white/70 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/70">
+              <SummarizeButton text={canvasText} onResult={handleSummaryResult} />
             </div>
             <div className="min-h-[60vh]">
               <CanvasBoard
