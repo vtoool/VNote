@@ -21,6 +21,8 @@ import { createId } from '../lib/id'
 import CallModePanel from '../components/CallModePanel'
 import { SummarizeButton } from '../components/SummarizeButton'
 import { createQuestionCard } from '../lib/questions'
+import CanvasChatSidebar from '../components/CanvasChatSidebar'
+import { getCanvasPlainText } from '../lib/canvasText'
 
 export default function CanvasRoute() {
   const { projectId, canvasId } = useParams()
@@ -32,6 +34,7 @@ export default function CanvasRoute() {
   const { value, set, replace, undo, redo } = useUndoRedo<CanvasType | undefined>(canvas)
   const [importOpen, setImportOpen] = useState(false)
   const [callModeOpen, setCallModeOpen] = useState(false)
+  const [chatVisible, setChatVisible] = useState(true)
 
   useEffect(() => {
     if (canvas) {
@@ -60,28 +63,8 @@ export default function CanvasRoute() {
   const workingCanvas = value ?? canvas
 
   const canvasText = useMemo(() => {
-    return workingCanvas.cards
-      .map((card) => {
-        switch (card.type) {
-          case 'checklist': {
-            const checklist = card.checklist
-              .map((item) => `- [${item.completed ? 'x' : ' '}] ${item.text}`)
-              .join('\n')
-            return [card.title, card.content, checklist].filter(Boolean).join('\n')
-          }
-          case 'question':
-            return [card.title, card.content, card.answer]
-              .filter(Boolean)
-              .join('\n')
-          case 'media':
-            return [card.title, card.content, card.description].filter(Boolean).join('\n')
-          default:
-            return [card.title, card.content].filter(Boolean).join('\n')
-        }
-      })
-      .filter(Boolean)
-      .join('\n\n')
-  }, [workingCanvas.cards])
+    return getCanvasPlainText(workingCanvas)
+  }, [workingCanvas])
 
   const updateCanvas = (next: CanvasType) => {
     set(next)
@@ -193,69 +176,89 @@ export default function CanvasRoute() {
     updateCanvas({ ...workingCanvas, cards: [summaryCard, ...workingCanvas.cards] })
   }
 
+  const showChatSidebar = !callModeOpen && chatVisible
+
   return (
-    <div className="space-y-6">
-      <Toolbar
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        onExportJson={() => store.exportProject(project.id, 'json')}
-        onExportText={() => store.exportProject(project.id, 'text')}
-        onImport={() => setImportOpen(true)}
-        onToggleCallMode={() => setCallModeOpen((prev) => !prev)}
-        callModeActive={callModeOpen}
-      />
-      {callModeOpen ? (
-        <CallModePanel
-          project={project}
-          canvas={workingCanvas}
-          onCanvasChange={updateCanvas}
-          onCardChange={updateCard}
-          onCardDelete={deleteCard}
-          onClose={() => setCallModeOpen(false)}
+    <div className="relative">
+      <div className={`space-y-6 ${showChatSidebar ? 'lg:pr-[360px]' : ''}`}>
+        <Toolbar
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          onExportJson={() => store.exportProject(project.id, 'json')}
+          onExportText={() => store.exportProject(project.id, 'text')}
+          onImport={() => setImportOpen(true)}
+          onToggleCallMode={() => setCallModeOpen((prev) => !prev)}
+          callModeActive={callModeOpen}
         />
-      ) : (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start lg:min-h-[calc(100vh-8rem)]">
-          <div className="flex flex-col gap-4 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:pr-4">
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => addCard('sticky')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">New sticky</button>
-              <button onClick={() => addCard('checklist')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">Checklist</button>
-              <button onClick={() => addCard('question')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">Question</button>
-              <button onClick={() => addCard('media')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">Media</button>
-              <button onClick={() => addCard('text')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">Text</button>
+        {callModeOpen ? (
+          <CallModePanel
+            project={project}
+            canvas={workingCanvas}
+            onCanvasChange={updateCanvas}
+            onCardChange={updateCard}
+            onCardDelete={deleteCard}
+            onClose={() => setCallModeOpen(false)}
+          />
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start lg:min-h-[calc(100vh-8rem)]">
+            <div className="flex flex-col gap-4 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:pr-4">
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => addCard('sticky')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">New sticky</button>
+                <button onClick={() => addCard('checklist')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">Checklist</button>
+                <button onClick={() => addCard('question')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">Question</button>
+                <button onClick={() => addCard('media')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">Media</button>
+                <button onClick={() => addCard('text')} className="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm hover:bg-white dark:bg-slate-900/60 dark:text-slate-200">Text</button>
+              </div>
+              <div className="rounded-3xl border border-indigo-200/60 bg-white/70 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/70">
+                <SummarizeButton text={canvasText} onResult={handleSummaryResult} />
+              </div>
+              <div className="min-h-[60vh]">
+                <CanvasBoard
+                  canvas={workingCanvas}
+                  onChange={updateCanvas}
+                  onCardChange={updateCard}
+                  onCardDelete={deleteCard}
+                />
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <ObjectionsLog cards={workingCanvas.cards} />
+                <MutualActionPlan onExport={(items) => {
+                  const lines = items.map((item) => `${item.owner}: ${item.action} (${item.due})`).join('\n')
+                  const blob = new Blob([lines], { type: 'text/plain;charset=utf-8' })
+                  const url = URL.createObjectURL(blob)
+                  const link = document.createElement('a')
+                  link.href = url
+                  link.download = `${project.name}-mutual-action-plan.txt`
+                  link.click()
+                  URL.revokeObjectURL(url)
+                }} />
+              </div>
             </div>
-            <div className="rounded-3xl border border-indigo-200/60 bg-white/70 p-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/70">
-              <SummarizeButton text={canvasText} onResult={handleSummaryResult} />
-            </div>
-            <div className="min-h-[60vh]">
-              <CanvasBoard
-                canvas={workingCanvas}
-                onChange={updateCanvas}
-                onCardChange={updateCard}
-                onCardDelete={deleteCard}
-              />
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <ObjectionsLog cards={workingCanvas.cards} />
-              <MutualActionPlan onExport={(items) => {
-                const lines = items.map((item) => `${item.owner}: ${item.action} (${item.due})`).join('\n')
-                const blob = new Blob([lines], { type: 'text/plain;charset=utf-8' })
-                const url = URL.createObjectURL(blob)
-                const link = document.createElement('a')
-                link.href = url
-                link.download = `${project.name}-mutual-action-plan.txt`
-                link.click()
-                URL.revokeObjectURL(url)
-              }} />
-            </div>
+            <aside className="space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:pr-2" role="complementary" aria-label="Guided conversation tools">
+              <ScriptPanel project={project} onCaptureAnswer={handleCaptureAnswer} />
+              <PersonalBullets bullets={project.personalBullets} />
+              <HelpShortcuts />
+            </aside>
           </div>
-          <aside className="space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:pr-2" role="complementary" aria-label="Guided conversation tools">
-            <ScriptPanel project={project} onCaptureAnswer={handleCaptureAnswer} />
-            <PersonalBullets bullets={project.personalBullets} />
-            <HelpShortcuts />
-          </aside>
-        </div>
+        )}
+        <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onImport={handleImport} />
+      </div>
+      {showChatSidebar && (
+        <CanvasChatSidebar
+          canvas={workingCanvas}
+          canvasId={canvas.id}
+          onClose={() => setChatVisible(false)}
+        />
       )}
-      <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onImport={handleImport} />
+      {!callModeOpen && !chatVisible && (
+        <button
+          type="button"
+          className="fixed bottom-4 right-4 z-20 rounded-2xl bg-indigo-500/80 px-4 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur"
+          onClick={() => setChatVisible(true)}
+        >
+          Open canvas AI chat
+        </button>
+      )}
     </div>
   )
 }
