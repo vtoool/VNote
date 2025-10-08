@@ -6,7 +6,6 @@ import Toolbar from '../components/Toolbar'
 import ScriptPanel from '../components/ScriptPanel'
 import PersonalBullets from '../components/PersonalBullets'
 import ObjectionsLog from '../components/ObjectionsLog'
-import MutualActionPlan from '../components/MutualActionPlan'
 import HelpShortcuts from '../components/HelpShortcuts'
 import ImportDialog from '../components/ImportDialog'
 import { useUndoRedo } from '../hooks/useUndoRedo'
@@ -222,16 +221,6 @@ export default function CanvasRoute() {
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <ObjectionsLog cards={workingCanvas.cards} />
-                <MutualActionPlan onExport={(items) => {
-                  const lines = items.map((item) => `${item.owner}: ${item.action} (${item.due})`).join('\n')
-                  const blob = new Blob([lines], { type: 'text/plain;charset=utf-8' })
-                  const url = URL.createObjectURL(blob)
-                  const link = document.createElement('a')
-                  link.href = url
-                  link.download = `${project.name}-mutual-action-plan.txt`
-                  link.click()
-                  URL.revokeObjectURL(url)
-                }} />
               </div>
             </div>
             <aside className="space-y-4 lg:sticky lg:top-24 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:pr-2" role="complementary" aria-label="Guided conversation tools">
