@@ -1,5 +1,4 @@
 import { ThemeState } from "../lib/theme";
-import GeminiTestCard from "../components/GeminiTestCard";
 
 interface SettingsProps {
   theme: ThemeState;
@@ -56,7 +55,6 @@ export default function SettingsRoute({ theme, onThemeChange }: SettingsProps) {
             </button>
           </div>
         </div>
-        <GeminiTestCard className="rounded-3xl bg-white/70 p-4 shadow-sm dark:bg-slate-900/70" />
       </section>
     </div>
   );

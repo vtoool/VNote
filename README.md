@@ -52,9 +52,9 @@ The included workflow in `.github/workflows/deploy.yml` builds the app and publi
 - Adjust the three starter templates in `src/lib/templates.ts`.
 - Localize strings in `src/lib/i18n.ts`.
 
-### Try your Gemini API key
+### Summarize any canvas with AI
 
-Head to the **Settings** page from the sidebar to find the Gemini API tester card. Enter a prompt and hit **Send test prompt**—the tester ships with a bundled credential so it immediately talks to the live Gemini API without asking you for a key. If you rotate the key, update `DEFAULT_GEMINI_API_KEY` in `src/config/gemini.ts`.
+Open a project canvas and hit **Summarize note** to send the current cards to the Groq-backed Cloudflare Worker. The summary is added back to the canvas as a fresh card so you can keep it alongside your notes.
 
 ## Future roadmap
 
