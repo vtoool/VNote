@@ -1,7 +1,9 @@
 export const GRID_SPACING = 48
-const DEFAULT_CARD_WIDTH = GRID_SPACING * 8
-const DEFAULT_CARD_HEIGHT = GRID_SPACING * 8
-const CARD_MARGIN = 1
+const DEFAULT_CARD_WIDTH = GRID_SPACING * 7
+const DEFAULT_CARD_HEIGHT = GRID_SPACING * 5
+const CARD_MARGIN = 0
+const DEFAULT_COLUMN_SPAN = Math.max(1, Math.ceil(DEFAULT_CARD_WIDTH / GRID_SPACING))
+const DEFAULT_ROW_SPAN = Math.max(1, Math.ceil(DEFAULT_CARD_HEIGHT / GRID_SPACING))
 
 export function snapValueToGrid(value: number): number {
   return Math.round(value / GRID_SPACING) * GRID_SPACING
@@ -72,10 +74,7 @@ export function findNextGridPositionWithOverflow<T extends Positionable>(
   }
 
   const footprints = cards.map((card) => getFootprint(card, CARD_MARGIN))
-  const candidatePrototype = getFootprint(
-    { x: 0, y: 0, width: DEFAULT_CARD_WIDTH, height: DEFAULT_CARD_HEIGHT },
-    CARD_MARGIN
-  )
+  const candidatePrototype = getFootprint({ x: 0, y: 0, width: DEFAULT_CARD_WIDTH, height: DEFAULT_CARD_HEIGHT })
   const minCol = Math.min(0, candidatePrototype.colStart, ...footprints.map((footprint) => footprint.colStart))
   const minRow = Math.min(0, candidatePrototype.rowStart, ...footprints.map((footprint) => footprint.rowStart))
   const maxCol = Math.max(candidatePrototype.colEnd, ...footprints.map((footprint) => footprint.colEnd))
@@ -100,8 +99,10 @@ export function findNextGridPositionWithOverflow<T extends Positionable>(
   }
 
   const fallback = {
-    colStart: maxCol + padding + 1,
-    rowStart: maxRow + padding + 1
+    colStart:
+      Math.max(0, Math.ceil((maxCol + padding + 1) / DEFAULT_COLUMN_SPAN) * DEFAULT_COLUMN_SPAN),
+    rowStart:
+      Math.max(0, Math.ceil((maxRow + padding + 1) / DEFAULT_ROW_SPAN) * DEFAULT_ROW_SPAN)
   }
 
   return {
