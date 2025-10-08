@@ -37,8 +37,8 @@ function normalizeDimension(value: number | undefined, fallback: number) {
 function getFootprint(card: Positionable): Footprint {
   const width = normalizeDimension(card.width, DEFAULT_CARD_WIDTH)
   const height = normalizeDimension(card.height, DEFAULT_CARD_HEIGHT)
-  const colStart = Math.round(card.x / GRID_SPACING)
-  const rowStart = Math.round(card.y / GRID_SPACING)
+  const colStart = Math.floor(card.x / GRID_SPACING)
+  const rowStart = Math.floor(card.y / GRID_SPACING)
   const colSpan = Math.max(1, Math.ceil(width / GRID_SPACING))
   const rowSpan = Math.max(1, Math.ceil(height / GRID_SPACING))
   return {
