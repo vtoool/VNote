@@ -180,7 +180,7 @@ export default function CanvasRoute() {
 
   return (
     <div className="relative">
-      <div className={`space-y-6 ${showChatSidebar ? 'lg:pr-[360px]' : ''}`}>
+      <div className="space-y-6">
         <Toolbar
           onUndo={handleUndo}
           onRedo={handleRedo}
