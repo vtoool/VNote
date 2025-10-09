@@ -20,10 +20,17 @@ import type {
 } from './types'
 import type { Script } from '../lib/storage'
 
-const STORAGE_KEY = 'vnote.sales.conversation'
+const STORAGE_NAMESPACE = 'vnote.sales.conversation'
 const MAX_HISTORY_ENTRIES = 150
 const MAX_PROMPT_CHARACTERS = 8000
 const MAX_PROMPT_TURNS = 40
+const MAX_TOTAL_TOKENS = 6000
+const MIN_COMPLETION_TOKENS = 256
+const MAX_COMPLETION_TOKENS = 1200
+const TOKEN_SAFETY_MARGIN = 400
+
+export const getConversationStorageKey = (projectId?: string): string =>
+  projectId ? `${STORAGE_NAMESPACE}.${projectId}` : STORAGE_NAMESPACE
 
 const STOP_WORDS = new Set([
   'the',
@@ -79,6 +86,7 @@ interface UseConversationEngineOptions {
   personaName?: string
   plan?: SalesPlan
   objectionLibrary?: ObjectionPlaybookEntry[]
+  projectId?: string
 }
 
 interface ExportPayload {
@@ -101,6 +109,8 @@ const decodeJsonString = (value: string): string => {
       .replace(/\\\\/g, '\\')
   }
 }
+
+const estimateTokens = (text: string): number => Math.ceil(text.length / 4)
 
 const extractNextLinePreview = (buffer: string): string | null => {
   const match = buffer.match(/"next_line"\s*:\s*"((?:[^"\\]|\\.)*)/)
@@ -219,7 +229,8 @@ export function useConversationEngine({
   script: externalScript,
   personaName,
   plan: planOverride,
-  objectionLibrary: objectionOverride
+  objectionLibrary: objectionOverride,
+  projectId
 }: UseConversationEngineOptions = {}) {
   const plan = useMemo(() => planOverride ?? SALES_PLAN, [planOverride])
   const baseGoals = useMemo(
@@ -235,40 +246,29 @@ export function useConversationEngine({
     [objectionOverride]
   )
 
-  const [storedState] = useState<StoredState | null>(() => {
-    if (typeof window === 'undefined') return null
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY)
-      if (!raw) return null
-      const parsed = JSON.parse(raw) as StoredState
-      if (!parsed || typeof parsed !== 'object') return null
-      return parsed
-    } catch (error) {
-      console.warn('Failed to parse stored conversation state', error)
-      return null
-    }
-  })
+  const storageKey = useMemo(() => getConversationStorageKey(projectId), [projectId])
 
-  const [history, setHistory] = useState<ConversationTurn[]>(() => storedState?.history ?? [])
-  const [goals, setGoals] = useState<GoalState[]>(() => storedState?.goals ?? baseGoals)
-  const [checklist, setChecklist] = useState<ChecklistItemState[]>(() => storedState?.checklist ?? baseChecklist)
+  const [history, setHistory] = useState<ConversationTurn[]>([])
+  const [goals, setGoals] = useState<GoalState[]>(() => baseGoals.map((goal) => ({ ...goal })))
+  const [checklist, setChecklist] = useState<ChecklistItemState[]>(() =>
+    baseChecklist.map((item) => ({ ...item }))
+  )
   const [persona, setPersona] = useState<Persona>(() => {
-    const base = storedState?.persona ?? plan.persona
+    const base = plan.persona
     return { ...base, name: personaName ?? base.name }
   })
   const [script, setScript] = useState<Script | undefined>(() => externalScript)
-  const [currentProposal, setCurrentProposal] = useState<Proposal | null>(
-    () => storedState?.currentProposal ?? null
-  )
+  const [currentProposal, setCurrentProposal] = useState<Proposal | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<EngineToast | null>(null)
   const [streamingNextLine, setStreamingNextLine] = useState('')
+  const [isInitialized, setIsInitialized] = useState(false)
 
-  const historyRef = useRef<ConversationTurn[]>(storedState?.history ?? [])
-  const goalsRef = useRef<GoalState[]>(storedState?.goals ?? baseGoals)
-  const checklistRef = useRef<ChecklistItemState[]>(storedState?.checklist ?? baseChecklist)
-  const proposalRef = useRef<Proposal | null>(storedState?.currentProposal ?? null)
+  const historyRef = useRef<ConversationTurn[]>([])
+  const goalsRef = useRef<GoalState[]>(baseGoals.map((goal) => ({ ...goal })))
+  const checklistRef = useRef<ChecklistItemState[]>(baseChecklist.map((item) => ({ ...item })))
+  const proposalRef = useRef<Proposal | null>(null)
   const streamingBufferRef = useRef('')
   const abortControllerRef = useRef<AbortController | null>(null)
   const lastCustomerTextRef = useRef<string>('')
@@ -279,6 +279,46 @@ export function useConversationEngine({
     return Boolean(nav.gpu) && import.meta.env.VITE_ENABLE_GPU_SENTIMENT === 'true'
   }, [])
   const pipelinePromiseRef = useRef<Promise<any> | null>(null)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    setIsInitialized(false)
+    let parsed: StoredState | null = null
+    try {
+      const raw = window.localStorage.getItem(storageKey)
+      if (raw) {
+        const candidate = JSON.parse(raw) as StoredState
+        if (candidate && typeof candidate === 'object') {
+          parsed = candidate
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to parse stored conversation state', error)
+    }
+
+    const nextHistory = parsed?.history ?? []
+    const nextGoals = parsed?.goals?.map((goal) => ({ ...goal })) ?? baseGoals.map((goal) => ({ ...goal }))
+    const nextChecklist =
+      parsed?.checklist?.map((item) => ({ ...item })) ?? baseChecklist.map((item) => ({ ...item }))
+    const personaBase = parsed?.persona ?? plan.persona
+    const nextPersona = { ...personaBase, name: personaName ?? personaBase.name }
+    const nextProposal = parsed?.currentProposal ?? null
+
+    setHistory(nextHistory)
+    historyRef.current = nextHistory
+    setGoals(nextGoals)
+    goalsRef.current = nextGoals
+    setChecklist(nextChecklist)
+    checklistRef.current = nextChecklist
+    setPersona(nextPersona)
+    setCurrentProposal(nextProposal)
+    proposalRef.current = nextProposal
+    setStreamingNextLine('')
+    setError(null)
+    setToast(null)
+    setLoading(false)
+    setIsInitialized(true)
+  }, [storageKey, baseGoals, baseChecklist, personaName, plan.persona])
 
   useEffect(() => {
     historyRef.current = history
@@ -305,7 +345,7 @@ export function useConversationEngine({
   }, [externalScript])
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (!isInitialized || typeof window === 'undefined') return
     const payload: StoredState = {
       history,
       goals,
@@ -314,11 +354,11 @@ export function useConversationEngine({
       currentProposal: proposalRef.current
     }
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+      window.localStorage.setItem(storageKey, JSON.stringify(payload))
     } catch (error) {
       console.warn('Failed to persist conversation state', error)
     }
-  }, [history, goals, checklist, persona])
+  }, [history, goals, checklist, persona, storageKey, isInitialized, currentProposal])
 
   const ensurePipeline = useCallback(async () => {
     if (!advancedSentimentEnabled) return null
@@ -412,15 +452,23 @@ export function useConversationEngine({
     goalsRef.current = resetGoals
     setChecklist(resetChecklist)
     checklistRef.current = resetChecklist
+    const resetPersona = { ...plan.persona, name: personaName ?? plan.persona.name }
+    setPersona(resetPersona)
     setCurrentProposal(null)
     proposalRef.current = null
     setStreamingNextLine('')
     setError(null)
     setToast(null)
+    setLoading(false)
+    lastCustomerTextRef.current = ''
     if (typeof window !== 'undefined') {
-      window.localStorage.removeItem(STORAGE_KEY)
+      try {
+        window.localStorage.removeItem(storageKey)
+      } catch (storageError) {
+        console.warn('Failed to clear conversation state', storageError)
+      }
     }
-  }, [baseGoals, baseChecklist])
+  }, [baseGoals, baseChecklist, personaName, plan.persona, storageKey])
 
   const exportTranscript = useCallback(() => {
     const payload: ExportPayload = {
@@ -484,7 +532,7 @@ export function useConversationEngine({
       streamingBufferRef.current = ''
       setStreamingNextLine('')
 
-      const promptHistory = trimHistoryForPrompt(historyRef.current)
+      let promptHistory = trimHistoryForPrompt(historyRef.current)
       const systemPrompt = buildSystemPrompt({
         persona,
         plan,
@@ -492,7 +540,7 @@ export function useConversationEngine({
         objectionLibrary
       })
 
-      const userContext = renderUserContext({
+      let userContext = renderUserContext({
         plan,
         goals: goalsRef.current,
         checklist: checklistRef.current,
@@ -501,6 +549,55 @@ export function useConversationEngine({
         mode,
         objectionText
       })
+
+      const resolvePromptStats = () => {
+        const promptTokens = estimateTokens(systemPrompt) + estimateTokens(userContext)
+        const rawAvailable = MAX_TOTAL_TOKENS - promptTokens
+        return {
+          rawAvailable,
+          availableWithMargin: rawAvailable - TOKEN_SAFETY_MARGIN
+        }
+      }
+
+      let { rawAvailable, availableWithMargin } = resolvePromptStats()
+
+      while (availableWithMargin < MIN_COMPLETION_TOKENS && promptHistory.length > 0) {
+        promptHistory = promptHistory.slice(1)
+        userContext = renderUserContext({
+          plan,
+          goals: goalsRef.current,
+          checklist: checklistRef.current,
+          history: promptHistory,
+          contextSignals,
+          mode,
+          objectionText
+        })
+        ;({ rawAvailable, availableWithMargin } = resolvePromptStats())
+      }
+
+      let maxTokens = Math.min(
+        MAX_COMPLETION_TOKENS,
+        Math.max(MIN_COMPLETION_TOKENS, availableWithMargin)
+      )
+
+      if (availableWithMargin < MIN_COMPLETION_TOKENS) {
+        maxTokens = Math.min(
+          MAX_COMPLETION_TOKENS,
+          Math.max(MIN_COMPLETION_TOKENS, rawAvailable)
+        )
+      }
+
+      if (rawAvailable <= 0) {
+        maxTokens = 0
+      } else if (maxTokens > rawAvailable) {
+        maxTokens = rawAvailable
+      }
+
+      if (maxTokens > 0 && maxTokens < 64) {
+        maxTokens = Math.min(64, rawAvailable)
+      }
+
+      const completionTokens = Math.floor(Math.max(0, maxTokens))
 
       const messages: ChatMessage[] = [
         { role: 'system', content: systemPrompt },
@@ -511,6 +608,7 @@ export function useConversationEngine({
       try {
         responseText = await streamChat(messages, {
           json: true,
+          maxTokens: completionTokens > 0 ? completionTokens : undefined,
           signal: controller.signal,
           onToken: (token) => {
             streamingBufferRef.current += token
