@@ -344,6 +344,7 @@ function createCardFromSeed(seed: TemplateCardSeed): Card {
     priority: 'medium' as const,
     x: 0,
     y: 0,
+    width: DEFAULT_CARD_WIDTH,
     createdAt: now,
     updatedAt: now
   }

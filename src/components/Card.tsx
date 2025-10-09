@@ -1,10 +1,11 @@
-import { useContext, useEffect, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { PencilSquareIcon } from '@heroicons/react/24/outline'
 import { Card, QuestionFieldState } from '../lib/storage'
 import { createId } from '../lib/id'
 import { quickTags } from '../lib/tags'
 import { StoreContext } from '../App'
 import { personalizeAgentText } from '../lib/personalization'
+import { DEFAULT_CARD_HEIGHT, DEFAULT_CARD_WIDTH, GRID_SPACING } from '../lib/canvasLayout'
 
 interface CardProps {
   card: Card
@@ -20,17 +21,38 @@ export default function CardComponent({ card, onChange, onDelete }: CardProps) {
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState(card.title)
   const titleInputRef = useRef<HTMLInputElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLTextAreaElement>(null)
 
   const isMediaCard = card.type === 'media'
   const baseClasses = `${
     isMediaCard
-      ? 'flex w-auto min-w-[16rem] max-w-[28rem] flex-col overflow-hidden'
-      : 'flex max-h-[28rem] w-auto min-w-[16rem] max-w-[28rem] flex-col overflow-hidden'
+      ? 'flex w-full min-h-[280px] min-w-[16rem] max-w-[28rem] flex-col overflow-hidden'
+      : 'flex w-full min-h-[280px] min-w-[16rem] max-w-[28rem] flex-col overflow-hidden'
   } border border-white/70 bg-white/90 p-4 text-sm shadow-soft dark:border-slate-800/70 dark:bg-slate-900/80`
+
+  const snapHeightToGrid = useCallback((value: number) => {
+    if (!Number.isFinite(value)) return DEFAULT_CARD_HEIGHT
+    const snapped = Math.ceil(value / GRID_SPACING) * GRID_SPACING
+    return Math.max(snapped, DEFAULT_CARD_HEIGHT)
+  }, [])
+
+  const adjustTextareaHeight = useCallback(() => {
+    const node = contentRef.current
+    if (!node) return
+    node.style.height = 'auto'
+    node.style.height = `${node.scrollHeight}px`
+  }, [])
 
   useEffect(() => {
     setTitleDraft(card.title)
   }, [card.title])
+
+  useEffect(() => {
+    if (card.width == null) {
+      onChange({ ...card, width: DEFAULT_CARD_WIDTH, updatedAt: new Date().toISOString() })
+    }
+  }, [card, card.width, onChange])
 
   useEffect(() => {
     if (editingTitle) {
@@ -48,6 +70,33 @@ export default function CardComponent({ card, onChange, onDelete }: CardProps) {
     }
     setEditingTitle(false)
   }
+
+  useLayoutEffect(() => {
+    adjustTextareaHeight()
+  }, [adjustTextareaHeight, card.content])
+
+  useEffect(() => {
+    const node = rootRef.current
+    if (!node) return
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (!entry) return
+      const nextHeight = snapHeightToGrid(entry.contentRect.height)
+      const currentHeight = card.height ?? DEFAULT_CARD_HEIGHT
+      if (Math.abs(currentHeight - nextHeight) < GRID_SPACING / 2) {
+        return
+      }
+      onChange({
+        ...card,
+        height: nextHeight,
+        updatedAt: new Date().toISOString()
+      })
+    })
+
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [card, onChange, snapHeightToGrid])
 
   const toggleTag = (tag: string) => {
     const tags = card.tags.includes(tag) ? card.tags.filter((t) => t !== tag) : [...card.tags, tag]
@@ -224,7 +273,7 @@ export default function CardComponent({ card, onChange, onDelete }: CardProps) {
   }
 
   return (
-    <div className={baseClasses} data-card-root="true">
+    <div ref={rootRef} className={baseClasses} data-card-root="true">
       <div className="mb-2 flex items-start justify-between gap-2">
         {editingTitle ? (
           <input
@@ -329,22 +378,25 @@ export default function CardComponent({ card, onChange, onDelete }: CardProps) {
           )}
         </div>
       ) : (
-        <div className="mt-3 flex-1 overflow-y-auto pr-1" style={{ touchAction: 'pan-y' }}>
-          <div className="space-y-3">
-            {showPersonalizedPreview && (
-              <div className="rounded-2xl bg-indigo-500/10 px-3 py-2 text-xs text-indigo-600 dark:bg-slate-900/60 dark:text-indigo-200">
-                <p className="font-semibold">Personalized preview</p>
-                <p>{personalizedContent}</p>
-              </div>
-            )}
-            <textarea
-              value={card.content}
-              onChange={(event) => onChange({ ...card, content: event.target.value, updatedAt: new Date().toISOString() })}
-              disabled={card.locked}
-              className="min-h-[6rem] w-full resize-y rounded-2xl border border-transparent bg-slate-100/50 p-2 text-sm focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:bg-slate-800/60"
-            />
+        <div className="mt-3 space-y-3" style={{ touchAction: 'pan-y' }}>
+          {showPersonalizedPreview && (
+            <div className="rounded-2xl bg-indigo-500/10 px-3 py-2 text-xs text-indigo-600 dark:bg-slate-900/60 dark:text-indigo-200">
+              <p className="font-semibold">Personalized preview</p>
+              <p>{personalizedContent}</p>
+            </div>
+          )}
+          <textarea
+            ref={contentRef}
+            value={card.content}
+            onChange={(event) =>
+              onChange({ ...card, content: event.target.value, updatedAt: new Date().toISOString() })
+            }
+            onInput={adjustTextareaHeight}
+            disabled={card.locked}
+            className="min-h-[6rem] w-full resize-none overflow-hidden rounded-2xl border border-transparent bg-slate-100/50 p-2 text-sm focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:bg-slate-800/60"
+          />
 
-            {card.type === 'checklist' && (
+          {card.type === 'checklist' && (
             <div className="space-y-2">
               <ul className="space-y-2">
                 {card.checklist.map((item) => (
@@ -422,8 +474,7 @@ export default function CardComponent({ card, onChange, onDelete }: CardProps) {
                 ))}
               </div>
             </div>
-            )}
-          </div>
+          )}
         </div>
       )}
     </div>
