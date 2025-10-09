@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'node:path'
 
@@ -10,6 +10,9 @@ export default defineConfig({
     }
   },
   base: '/VNote/',
+  test: {
+    environment: 'jsdom'
+  },
   build: {
     rollupOptions: {
       input: {
