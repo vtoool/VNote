@@ -166,18 +166,13 @@ export default function ConversationTimeline({
           </div>
         ) : (
           history.map((turn) => {
-            const roleLabel =
-              turn.role === 'assistant'
-                ? 'Assistant guidance'
-                : turn.role === 'agent'
-                ? 'Agent'
-                : 'Customer'
+            const roleLabel = turn.role === 'agent' ? 'Agent' : turn.role === 'customer' ? 'Customer' : null
             const sentiment = typeof turn.sentiment === 'number' ? turn.sentiment.toFixed(2) : null
             return (
               <div key={turn.id} className={`flex ${turn.role === 'agent' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[85%] rounded-3xl border px-4 py-3 text-sm leading-relaxed shadow-sm ${roleStyles[turn.role]}`}>
                   <div className="mb-1 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide">
-                    <span>{roleLabel}</span>
+                    {roleLabel && <span>{roleLabel}</span>}
                     {formatTime(turn.timestamp) && (
                       <span className="text-slate-400 dark:text-slate-300">{formatTime(turn.timestamp)}</span>
                     )}

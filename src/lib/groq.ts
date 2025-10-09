@@ -61,6 +61,25 @@ export async function streamChat(
     throw new Error(`Groq chat error ${response.status}: ${message}`)
   }
 
+  const contentType = response.headers.get('content-type')?.toLowerCase() ?? ''
+  const isEventStream = contentType.includes('text/event-stream')
+
+  if (!isEventStream) {
+    const text = await response.text()
+    const trimmed = text.trim()
+    if (trimmed && json) {
+      try {
+        const parsed = JSON.parse(trimmed)
+        onChunk?.(parsed)
+      } catch (error) {
+        console.warn('Failed to parse Groq response as JSON', error)
+      }
+    } else if (trimmed && onToken) {
+      onToken(trimmed)
+    }
+    return trimmed
+  }
+
   const reader = response.body.getReader()
   const decoder = new TextDecoder('utf-8')
   let aggregated = ''
