@@ -28,7 +28,6 @@ interface CallModePanelProps {
   onCardChange: (card: Card) => void
   onCardDelete: (cardId: string) => void
   onClose: () => void
-  onPointerPositionChange?: (position: { x: number; y: number } | null) => void
 }
 
 interface QuestionPointer {
@@ -170,8 +169,7 @@ export default function CallModePanel({
   onCanvasChange,
   onCardChange,
   onCardDelete,
-  onClose,
-  onPointerPositionChange
+  onClose
 }: CallModePanelProps) {
   const store = useContext(StoreContext)!
   const agentName = store.settings.agentName
@@ -500,7 +498,6 @@ export default function CallModePanel({
             onChange={onCanvasChange}
             onCardChange={onCardChange}
             onCardDelete={onCardDelete}
-            onPointerPositionChange={onPointerPositionChange}
           />
         </div>
         <div className="space-y-4 lg:pr-2">

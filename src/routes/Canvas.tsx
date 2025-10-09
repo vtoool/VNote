@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useContext, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { StoreContext } from '../App'
 import CanvasBoard from '../components/CanvasBoard'
@@ -20,21 +20,12 @@ import {
   DEFAULT_CARD_WIDTH,
   getNextCardPosition,
   snapPointToGrid,
-  toPlacementRect,
   toPlacementRects
 } from '../lib/canvasLayout'
 import { createId } from '../lib/id'
 import CallModePanel from '../components/CallModePanel'
 import { SummarizeButton } from '../components/SummarizeButton'
 import { createQuestionCard } from '../lib/questions'
-import {
-  ImagePasteContext,
-  blobToDataUrl,
-  clampImageDimensions,
-  getImageDimensions,
-  installImagePasteHandler
-} from '../lib/imagePaste'
-import { createMediaCard } from '../lib/storage'
 import CanvasChatSidebar from '../components/CanvasChatSidebar'
 import { getCanvasPlainText } from '../lib/canvasText'
 
@@ -49,13 +40,6 @@ export default function CanvasRoute() {
   const [importOpen, setImportOpen] = useState(false)
   const [callModeOpen, setCallModeOpen] = useState(false)
   const [chatVisible, setChatVisible] = useState(true)
-  const [clipboardToast, setClipboardToast] = useState<{
-    id: number
-    message: string
-    tone: 'success' | 'error'
-  } | null>(null)
-  const toastTimeoutRef = useRef<number | null>(null)
-  const pointerPositionRef = useRef<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     if (canvas) {
@@ -82,11 +66,6 @@ export default function CanvasRoute() {
   }
 
   const workingCanvas = value ?? canvas
-  const workingCanvasRef = useRef<CanvasType>(workingCanvas)
-
-  useEffect(() => {
-    workingCanvasRef.current = workingCanvas
-  }, [workingCanvas])
 
   const canvasText = useMemo(() => {
     return getCanvasPlainText(workingCanvas)
@@ -96,12 +75,6 @@ export default function CanvasRoute() {
     set(next)
     store.updateCanvas(project.id, canvas.id, () => ({ ...next, updatedAt: new Date().toISOString() }))
   }
-
-  const updateCanvasRef = useRef(updateCanvas)
-
-  useEffect(() => {
-    updateCanvasRef.current = updateCanvas
-  }, [updateCanvas])
 
   const handleUndo = () => {
     const previous = undo()
@@ -219,145 +192,6 @@ export default function CanvasRoute() {
 
   const showChatSidebar = !callModeOpen && chatVisible
 
-  const showClipboardToast = useCallback((message: string, tone: 'success' | 'error') => {
-    setClipboardToast({ id: Date.now(), message, tone })
-  }, [])
-
-  useEffect(() => {
-    if (!clipboardToast) return
-    if (toastTimeoutRef.current) {
-      window.clearTimeout(toastTimeoutRef.current)
-    }
-    toastTimeoutRef.current = window.setTimeout(() => {
-      setClipboardToast((current) => (current && current.id === clipboardToast.id ? null : current))
-    }, 2400)
-    return () => {
-      if (toastTimeoutRef.current) {
-        window.clearTimeout(toastTimeoutRef.current)
-      }
-    }
-  }, [clipboardToast])
-
-  useEffect(() => () => {
-    if (toastTimeoutRef.current) {
-      window.clearTimeout(toastTimeoutRef.current)
-    }
-  }, [])
-
-  const resolveTargetCardId = useCallback((event: ClipboardEvent) => {
-    const fromEvent = (event.target as HTMLElement | null)?.closest('[data-card-root="true"]')
-    const fromActive = (document.activeElement as HTMLElement | null)?.closest('[data-card-root="true"]')
-    const host = fromEvent ?? fromActive
-    if (!host) return null
-    return host.getAttribute('data-card-type') === 'media' ? host.getAttribute('data-card-id') : null
-  }, [])
-
-  const shouldHandleClipboardEvent = useCallback(
-    (event: ClipboardEvent) => {
-      const target = event.target as HTMLElement | null
-      const active = document.activeElement as HTMLElement | null
-      const withinSurface = (node: HTMLElement | null) => Boolean(node?.closest('[data-canvas-surface="true"]'))
-      return withinSurface(target) || withinSurface(active) || Boolean(pointerPositionRef.current)
-    },
-    []
-  )
-
-  const handlePastedImages = useCallback(
-    async (blobs: Blob[], context: ImagePasteContext) => {
-      const currentCanvas = workingCanvasRef.current
-      if (!currentCanvas) return
-
-      let cards = [...currentCanvas.cards]
-      let placementRects = toPlacementRects(cards)
-      let pointerAvailable = Boolean(context.at)
-      let usedExistingCard = false
-      const newCards: Card[] = []
-
-      for (const [index, blob] of blobs.entries()) {
-        const dataUrl = await blobToDataUrl(blob)
-        const { width: intrinsicWidth, height: intrinsicHeight } = await getImageDimensions(blob)
-        const { width, height } = clampImageDimensions(intrinsicWidth, intrinsicHeight)
-
-        if (!usedExistingCard && context.targetCardId) {
-          const targetIndex = cards.findIndex((card) => card.id === context.targetCardId && card.type === 'media')
-          if (targetIndex !== -1) {
-            const targetCard = cards[targetIndex] as Card & { type: 'media' }
-            const updatedCard: Card = {
-              ...targetCard,
-              dataUrl,
-              width,
-              height,
-              updatedAt: new Date().toISOString()
-            }
-            cards = cards.map((card, i) => (i === targetIndex ? updatedCard : card))
-            placementRects = toPlacementRects(cards)
-            usedExistingCard = true
-            continue
-          }
-        }
-
-        let position: { x: number; y: number } | null = null
-        if (pointerAvailable && context.at) {
-          const snapped = snapPointToGrid(context.at)
-          const occupied = cards.some((card) => {
-            const snappedExisting = snapPointToGrid({ x: card.x, y: card.y })
-            return snappedExisting.x === snapped.x && snappedExisting.y === snapped.y
-          })
-          if (!occupied) {
-            position = snapped
-          }
-          pointerAvailable = false
-        }
-
-        if (!position) {
-          position = getNextCardPosition({ w: width, h: height }, placementRects)
-        }
-
-        const mediaCard = createMediaCard({
-          dataUrl,
-          position,
-          width,
-          height,
-          title: blobs.length > 1 ? `Pasted image ${index + 1}` : 'Pasted image'
-        })
-        cards = [mediaCard, ...cards]
-        placementRects = [toPlacementRect(mediaCard), ...placementRects]
-        newCards.push(mediaCard)
-      }
-
-      if (usedExistingCard || newCards.length > 0) {
-        const nextCanvas = {
-          ...currentCanvas,
-          cards,
-          updatedAt: new Date().toISOString()
-        }
-        updateCanvasRef.current(nextCanvas)
-        const totalImages = newCards.length + (usedExistingCard ? 1 : 0)
-        const message = totalImages > 1 ? `Pasted ${totalImages} images` : 'Image pasted'
-        showClipboardToast(message, 'success')
-      }
-    },
-    [showClipboardToast]
-  )
-
-  useEffect(() => {
-    const remove = installImagePasteHandler({
-      getCanvasPos: () => pointerPositionRef.current,
-      resolveTargetCardId,
-      shouldHandleEvent: shouldHandleClipboardEvent,
-      onImages: handlePastedImages,
-      onNoImage: (event) => {
-        if (shouldHandleClipboardEvent(event)) {
-          showClipboardToast('Clipboard has no image', 'error')
-        }
-      },
-      onError: () => {
-        showClipboardToast('Unable to access clipboard image', 'error')
-      }
-    })
-    return remove
-  }, [handlePastedImages, resolveTargetCardId, shouldHandleClipboardEvent, showClipboardToast])
-
   return (
     <div className="relative">
       <div className="space-y-6">
@@ -378,9 +212,6 @@ export default function CanvasRoute() {
             onCardChange={updateCard}
             onCardDelete={deleteCard}
             onClose={() => setCallModeOpen(false)}
-            onPointerPositionChange={(position) => {
-              pointerPositionRef.current = position
-            }}
           />
         ) : (
           <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start lg:min-h-[calc(100vh-8rem)]">
@@ -401,9 +232,6 @@ export default function CanvasRoute() {
                   onChange={updateCanvas}
                   onCardChange={updateCard}
                   onCardDelete={deleteCard}
-                  onPointerPositionChange={(position) => {
-                    pointerPositionRef.current = position
-                  }}
                 />
               </div>
               <div className="grid gap-4 md:grid-cols-2">
@@ -434,19 +262,6 @@ export default function CanvasRoute() {
         >
           Open canvas AI chat
         </button>
-      )}
-      {clipboardToast && (
-        <div className="pointer-events-none fixed right-6 top-28 z-40">
-          <div
-            className={`glass-panel px-4 py-2 text-sm font-medium ${
-              clipboardToast.tone === 'error'
-                ? 'text-rose-600 dark:text-rose-300'
-                : 'text-slate-700 dark:text-slate-100'
-            }`}
-          >
-            {clipboardToast.message}
-          </div>
-        </div>
       )}
     </div>
   )

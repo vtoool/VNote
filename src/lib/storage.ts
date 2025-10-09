@@ -292,45 +292,6 @@ export function createEmptyCanvas(name = 'New Canvas'): Canvas {
   }
 }
 
-export function createMediaCard({
-  dataUrl,
-  position,
-  width,
-  height,
-  title = 'Image',
-  description = '',
-  tags = []
-}: {
-  dataUrl: string
-  position: { x: number; y: number }
-  width?: number
-  height?: number
-  title?: string
-  description?: string
-  tags?: string[]
-}): MediaCard {
-  const now = new Date().toISOString()
-  return {
-    id: createId('card'),
-    type: 'media',
-    title,
-    content: '',
-    tags,
-    pinned: false,
-    locked: false,
-    color: '#f8fafc',
-    priority: 'medium',
-    x: position.x,
-    y: position.y,
-    width,
-    height,
-    createdAt: now,
-    updatedAt: now,
-    dataUrl,
-    description
-  }
-}
-
 function createCardFromSeed(seed: TemplateCardSeed): Card {
   const now = new Date().toISOString()
   const base = {
