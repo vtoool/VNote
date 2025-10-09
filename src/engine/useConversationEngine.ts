@@ -259,34 +259,64 @@ const extractCompletedFromRecord = (value: unknown): string[] => {
     .map(([name]) => String(name))
 }
 
+const pickString = (...candidates: unknown[]): string | undefined => {
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim().length > 0) {
+      return candidate
+    }
+  }
+  return undefined
+}
+
 const mapProposal = (payload: any, raw: string): Proposal => {
   const guidance = isRecord(payload?.guidance) ? payload.guidance : undefined
   const actions = isRecord(payload?.actions) ? payload.actions : undefined
 
   const nextLineSource =
-    (typeof guidance?.next_line === 'string' && guidance.next_line) ||
-    (typeof guidance?.nextLine === 'string' && guidance.nextLine) ||
-    (typeof payload?.next_line === 'string' && payload.next_line) ||
-    (typeof payload?.nextLine === 'string' && payload.nextLine) ||
-    raw
+    pickString(
+      guidance?.next_line,
+      guidance?.nextLine,
+      guidance?.nextbest_line,
+      guidance?.nextBestLine,
+      guidance?.next_best_line,
+      payload?.next_line,
+      payload?.nextLine,
+      payload?.nextbest_line,
+      payload?.nextBestLine,
+      payload?.next_best_line,
+      actions?.nextbest_line,
+      actions?.nextBestLine,
+      actions?.next_best_line
+    ) || raw
 
-  const rationaleSource =
-    (typeof guidance?.rationale === 'string' && guidance.rationale) ||
-    (typeof payload?.rationale === 'string' && payload.rationale) ||
-    ''
+  const rationaleSource = pickString(guidance?.rationale, payload?.rationale) || ''
 
   const followupSource =
     guidance?.suggested_followups ??
     guidance?.followups ??
+    guidance?.nextbest_followups ??
+    guidance?.nextBestFollowups ??
+    guidance?.next_best_followups ??
     payload?.followups ??
+    payload?.nextbest_followups ??
+    payload?.nextBestFollowups ??
+    payload?.next_best_followups ??
     actions?.suggested_followups ??
-    actions?.followups
+    actions?.followups ??
+    actions?.nextbest_followups ??
+    actions?.nextBestFollowups ??
+    actions?.next_best_followups
 
   const expectedRaw =
     guidance?.expected_customer_reply_type ??
     guidance?.expectedCustomerReplyType ??
+    guidance?.expected_nextbest_reply_type ??
     payload?.expected_customer_reply_type ??
-    payload?.expectedCustomerReplyType
+    payload?.expectedCustomerReplyType ??
+    payload?.expected_nextbest_reply_type ??
+    actions?.expected_customer_reply_type ??
+    actions?.expectedCustomerReplyType ??
+    actions?.expected_nextbest_reply_type
 
   const expected: Proposal['expectedCustomerReplyType'] =
     expectedRaw === 'yes_no' || expectedRaw === 'narrative' || expectedRaw === 'selection'
