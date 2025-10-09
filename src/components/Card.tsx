@@ -21,7 +21,12 @@ export default function CardComponent({ card, onChange, onDelete }: CardProps) {
   const [titleDraft, setTitleDraft] = useState(card.title)
   const titleInputRef = useRef<HTMLInputElement>(null)
 
-  const baseClasses = 'flex max-h-[28rem] w-auto min-w-[16rem] max-w-[28rem] flex-col overflow-hidden rounded-3xl border border-white/70 bg-white/90 p-4 text-sm shadow-soft dark:border-slate-800/70 dark:bg-slate-900/80'
+  const isMediaCard = card.type === 'media'
+  const baseClasses = `${
+    isMediaCard
+      ? 'flex w-auto min-w-[16rem] max-w-[28rem] flex-col overflow-hidden'
+      : 'flex max-h-[28rem] w-auto min-w-[16rem] max-w-[28rem] flex-col overflow-hidden'
+  } border border-white/70 bg-white/90 p-4 text-sm shadow-soft dark:border-slate-800/70 dark:bg-slate-900/80`
 
   useEffect(() => {
     setTitleDraft(card.title)
@@ -292,22 +297,54 @@ export default function CardComponent({ card, onChange, onDelete }: CardProps) {
         </div>
       </div>
 
-      <div className="mt-3 flex-1 overflow-y-auto pr-1" style={{ touchAction: 'pan-y' }}>
-        <div className="space-y-3">
-          {showPersonalizedPreview && (
-            <div className="rounded-2xl bg-indigo-500/10 px-3 py-2 text-xs text-indigo-600 dark:bg-slate-900/60 dark:text-indigo-200">
-              <p className="font-semibold">Personalized preview</p>
-              <p>{personalizedContent}</p>
+      {isMediaCard ? (
+        <div className="mt-3">
+          {card.dataUrl ? (
+            <figure className="overflow-hidden rounded-2xl bg-white/60 shadow-inner">
+              <img
+                src={card.dataUrl}
+                alt={card.description || card.title || 'Media image'}
+                className="block h-full w-full object-contain"
+              />
+            </figure>
+          ) : (
+            <div className="space-y-2 text-xs">
+              <input
+                type="file"
+                accept="image/*"
+                disabled={card.locked}
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  if (!file) return
+                  const reader = new FileReader()
+                  reader.onload = () => {
+                    onChange({ ...card, dataUrl: reader.result as string, updatedAt: new Date().toISOString() })
+                  }
+                  reader.readAsDataURL(file)
+                }}
+                className="w-full rounded-2xl border border-dashed border-indigo-300/60 bg-white/70 px-3 py-12 text-center font-medium text-indigo-600 transition hover:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
+              <p className="text-center text-slate-500">Upload an image to display it here.</p>
             </div>
           )}
-          <textarea
-            value={card.content}
-            onChange={(event) => onChange({ ...card, content: event.target.value, updatedAt: new Date().toISOString() })}
-            disabled={card.locked}
-            className="min-h-[6rem] w-full resize-y rounded-2xl border border-transparent bg-slate-100/50 p-2 text-sm focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:bg-slate-800/60"
-          />
+        </div>
+      ) : (
+        <div className="mt-3 flex-1 overflow-y-auto pr-1" style={{ touchAction: 'pan-y' }}>
+          <div className="space-y-3">
+            {showPersonalizedPreview && (
+              <div className="rounded-2xl bg-indigo-500/10 px-3 py-2 text-xs text-indigo-600 dark:bg-slate-900/60 dark:text-indigo-200">
+                <p className="font-semibold">Personalized preview</p>
+                <p>{personalizedContent}</p>
+              </div>
+            )}
+            <textarea
+              value={card.content}
+              onChange={(event) => onChange({ ...card, content: event.target.value, updatedAt: new Date().toISOString() })}
+              disabled={card.locked}
+              className="min-h-[6rem] w-full resize-y rounded-2xl border border-transparent bg-slate-100/50 p-2 text-sm focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:bg-slate-800/60"
+            />
 
-          {card.type === 'checklist' && (
+            {card.type === 'checklist' && (
             <div className="space-y-2">
               <ul className="space-y-2">
                 {card.checklist.map((item) => (
@@ -385,38 +422,10 @@ export default function CardComponent({ card, onChange, onDelete }: CardProps) {
                 ))}
               </div>
             </div>
-          )}
-
-          {card.type === 'media' && (
-            <div className="space-y-2 text-xs">
-              <input
-                type="file"
-                accept="image/*"
-                disabled={card.locked}
-                onChange={async (event) => {
-                  const file = event.target.files?.[0]
-                  if (!file) return
-                  const reader = new FileReader()
-                  reader.onload = () => {
-                    onChange({ ...card, dataUrl: reader.result as string, updatedAt: new Date().toISOString() })
-                  }
-                  reader.readAsDataURL(file)
-                }}
-              />
-              {card.dataUrl && (
-                <img src={card.dataUrl} alt={card.description} className="w-full rounded-2xl object-cover" />
-              )}
-              <input
-                value={card.description}
-                onChange={(event) => onChange({ ...card, description: event.target.value, updatedAt: new Date().toISOString() })}
-                placeholder="Describe the media"
-                disabled={card.locked}
-                className="w-full rounded-2xl border border-indigo-300/40 bg-white/80 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:border-slate-700/50 dark:bg-slate-900/60"
-              />
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
