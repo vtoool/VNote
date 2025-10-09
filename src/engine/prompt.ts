@@ -20,8 +20,12 @@ function formatGoals(goals: GoalState[]): string {
   return goals.map((goal) => `${goal.done ? '[x]' : '[ ]'} ${goal.name}`).join('\n')
 }
 
+const MAX_TRANSCRIPT_TURNS = 12
+const MAX_TURN_CHARACTERS = 280
+
 function formatTranscript(history: ConversationTurn[]): string {
-  return history
+  const recent = history.slice(-MAX_TRANSCRIPT_TURNS)
+  return recent
     .map((turn) => {
       const timestamp = new Date(turn.timestamp)
       const time = Number.isNaN(timestamp.getTime())
@@ -29,7 +33,10 @@ function formatTranscript(history: ConversationTurn[]): string {
         : `(${timestamp.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })})`
       const sentiment = typeof turn.sentiment === 'number' ? ` sentiment=${turn.sentiment.toFixed(2)}` : ''
       const label = turn.role.toUpperCase()
-      return `${label} ${time}${sentiment}: ${turn.text}`
+      const text = turn.text.length > MAX_TURN_CHARACTERS
+        ? `${turn.text.slice(0, MAX_TURN_CHARACTERS - 1)}…`
+        : turn.text
+      return `${label} ${time}${sentiment}: ${text}`
     })
     .join('\n')
 }
@@ -44,9 +51,10 @@ function describePlanStages(planStages: SalesPlanStage[], checklist: ChecklistIt
   return planStages
     .map((stage, index) => {
       const status = index < currentIndex ? 'complete' : index === currentIndex ? 'current' : 'upcoming'
-      return `${index + 1}. ${stage.title} — status: ${status}. Objective: ${stage.objective}. Key cues: ${stage.cues.join(
-        '; '
-      )}. Checkpoint: ${stage.checkpoint}`
+      const cues = stage.cues.slice(0, 2).join(', ')
+      const checkpoint = stage.checkpoint.length > 120 ? `${stage.checkpoint.slice(0, 119)}…` : stage.checkpoint
+      const objective = stage.objective.length > 120 ? `${stage.objective.slice(0, 119)}…` : stage.objective
+      return `${index + 1}. ${stage.title} — status: ${status}. Objective: ${objective}. Key cues: ${cues}. Checkpoint: ${checkpoint}`
     })
     .join('\n')
 }
@@ -55,27 +63,25 @@ function describeScript(script?: Script): string {
   if (!script) return 'Script not provided. Use plan + discovery framework as guidance.'
   const sections = script.sections
     .map((section) => {
-      const questions = section.questions
-        .map((question) => {
-          const variants = question.variants.map((variant) => `• ${variant.text} (${variant.tone})`).join('\n')
-          const tags = question.tags.length ? `Tags: ${question.tags.join(', ')}` : ''
-          return `- ${question.label}${tags ? ` — ${tags}` : ''}${variants ? `\n${variants}` : ''}`
-        })
-        .join('\n')
-      return `${section.title}: ${section.cues}\n${questions}`
+      const questionLabels = section.questions.map((question) => question.label)
+      const highlighted = questionLabels.slice(0, 4).join('; ')
+      const extra = questionLabels.length > 4 ? '…' : ''
+      const cues = section.cues.length > 140 ? `${section.cues.slice(0, 139)}…` : section.cues
+      return `${section.title}: ${cues}. Focus questions: ${highlighted}${extra}`
     })
-    .join('\n\n')
+    .join('\n')
   return sections
 }
 
 function describeObjections(objections: ObjectionPlaybookEntry[]): string {
   return objections
     .map((objection) => {
-      return `${objection.category.toUpperCase()}: ${objection.summary}\nTriggers: ${objection.triggers.join(
-        ', '
-      )}\nCounters: ${objection.counters.join(' | ')}\nFollow-ups: ${objection.followUps.join(' | ')}`
+      const triggers = objection.triggers.slice(0, 3).join(', ')
+      const counters = objection.counters.slice(0, 2).join(' | ') || 'n/a'
+      const followUps = objection.followUps.slice(0, 2).join(' | ') || 'n/a'
+      return `${objection.category.toUpperCase()}: ${objection.summary}. Triggers: ${triggers}. Counters: ${counters}. Follow-ups: ${followUps}`
     })
-    .join('\n\n')
+    .join('\n')
 }
 
 function summarizeSignals(signals: ContextSignals): string {
