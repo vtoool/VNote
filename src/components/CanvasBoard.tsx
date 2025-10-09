@@ -14,16 +14,9 @@ interface CanvasBoardProps {
   onChange: (canvas: Canvas) => void
   onCardChange: (card: Card) => void
   onCardDelete: (cardId: string) => void
-  onPointerPositionChange?: (position: { x: number; y: number } | null) => void
 }
 
-export default function CanvasBoard({
-  canvas,
-  onChange,
-  onCardChange,
-  onCardDelete,
-  onPointerPositionChange
-}: CanvasBoardProps) {
+export default function CanvasBoard({ canvas, onChange, onCardChange, onCardDelete }: CanvasBoardProps) {
   const [showGrid, setShowGrid] = useState(true)
   const [isPanning, setIsPanning] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -35,7 +28,6 @@ export default function CanvasBoard({
   } | null>(null)
   const latestCanvasRef = useRef(canvas)
   const onChangeRef = useRef(onChange)
-  const pointerCallbackRef = useRef(onPointerPositionChange)
 
   useEffect(() => {
     latestCanvasRef.current = canvas
@@ -46,24 +38,8 @@ export default function CanvasBoard({
   }, [onChange])
 
   useEffect(() => {
-    pointerCallbackRef.current = onPointerPositionChange
-  }, [onPointerPositionChange])
-
-  useEffect(() => {
     const container = containerRef.current
     if (!container) return
-
-    const notifyPointerPosition = (event: PointerEvent, positionOverride?: { x: number; y: number }) => {
-      if (!pointerCallbackRef.current) return
-      const rect = container.getBoundingClientRect()
-      const { zoom } = latestCanvasRef.current
-      const position = positionOverride ?? latestCanvasRef.current.position
-      const canvasPoint = {
-        x: (event.clientX - rect.left - position.x) / zoom,
-        y: (event.clientY - rect.top - position.y) / zoom
-      }
-      pointerCallbackRef.current(canvasPoint)
-    }
 
     const handlePointerDown = (event: PointerEvent) => {
       if (event.button !== 0 && event.pointerType !== 'touch') return
@@ -72,7 +48,6 @@ export default function CanvasBoard({
         return
       }
       event.preventDefault()
-      notifyPointerPosition(event)
       pointerStateRef.current = {
         originX: event.clientX,
         originY: event.clientY,
@@ -91,7 +66,6 @@ export default function CanvasBoard({
         y: canvasY + (event.clientY - originY)
       }
       onChangeRef.current({ ...latestCanvasRef.current, position: nextPosition })
-      notifyPointerPosition(event, nextPosition)
     }
 
     const endPan = () => {
@@ -110,34 +84,6 @@ export default function CanvasBoard({
       window.removeEventListener('pointermove', handlePointerMove)
       window.removeEventListener('pointerup', endPan)
       window.removeEventListener('pointercancel', endPan)
-    }
-  }, [])
-
-  useEffect(() => {
-    const container = containerRef.current
-    if (!container) return
-
-    const handlePointerMove = (event: PointerEvent) => {
-      if (!pointerCallbackRef.current) return
-      const rect = container.getBoundingClientRect()
-      const { zoom, position } = latestCanvasRef.current
-      const canvasPoint = {
-        x: (event.clientX - rect.left - position.x) / zoom,
-        y: (event.clientY - rect.top - position.y) / zoom
-      }
-      pointerCallbackRef.current(canvasPoint)
-    }
-
-    const handlePointerLeave = () => {
-      pointerCallbackRef.current?.(null)
-    }
-
-    container.addEventListener('pointermove', handlePointerMove)
-    container.addEventListener('pointerleave', handlePointerLeave)
-
-    return () => {
-      container.removeEventListener('pointermove', handlePointerMove)
-      container.removeEventListener('pointerleave', handlePointerLeave)
     }
   }, [])
 
@@ -173,7 +119,6 @@ export default function CanvasBoard({
   return (
     <div
       ref={containerRef}
-      data-canvas-surface="true"
       className={`relative h-[70vh] w-full overflow-hidden rounded-3xl border border-slate-200/60 bg-slate-100/80 dark:border-slate-700/60 dark:bg-slate-900/60 ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
       role="region"
       aria-label="Canvas workspace"
@@ -232,8 +177,6 @@ export default function CanvasBoard({
             <Rnd
               key={card.id}
               data-card-root="true"
-              data-card-id={card.id}
-              data-card-type={card.type}
               position={{ x: card.x, y: card.y }}
               size={{ width: card.width ?? 'auto', height: card.height ?? 'auto' }}
               scale={canvas.zoom}

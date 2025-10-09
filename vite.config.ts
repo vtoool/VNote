@@ -10,9 +10,6 @@ export default defineConfig({
     }
   },
   base: '/VNote/',
-  test: {
-    environment: 'jsdom'
-  },
   build: {
     rollupOptions: {
       input: {
