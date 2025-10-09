@@ -268,9 +268,92 @@ const pickString = (...candidates: unknown[]): string | undefined => {
   return undefined
 }
 
+const firstRecord = (...candidates: unknown[]): Record<string, any> | undefined => {
+  for (const candidate of candidates) {
+    if (isRecord(candidate)) return candidate
+  }
+  return undefined
+}
+
+const collectTextSnippets = (...values: unknown[]): string[] => {
+  const snippets: string[] = []
+  const push = (value: unknown) => {
+    if (typeof value === 'string') {
+      const trimmed = value.trim()
+      if (trimmed) {
+        snippets.push(trimmed)
+      }
+    }
+  }
+  const visit = (value: unknown) => {
+    if (!value) return
+    if (typeof value === 'string') {
+      push(value)
+      return
+    }
+    if (Array.isArray(value)) {
+      value.forEach(visit)
+      return
+    }
+    if (isRecord(value)) {
+      const candidateKeys = [
+        'line',
+        'text',
+        'message',
+        'prompt',
+        'statement',
+        'guidance',
+        'suggestion',
+        'ask',
+        'question'
+      ] as const
+      for (const key of candidateKeys) {
+        push(value[key])
+      }
+      if (Array.isArray(value.items)) {
+        value.items.forEach(visit)
+      }
+      if (Array.isArray(value.options)) {
+        value.options.forEach(visit)
+      }
+    }
+  }
+  values.forEach(visit)
+  return Array.from(new Set(snippets))
+}
+
 const mapProposal = (payload: any, raw: string): Proposal => {
   const guidance = isRecord(payload?.guidance) ? payload.guidance : undefined
   const actions = isRecord(payload?.actions) ? payload.actions : undefined
+  const bestNext = firstRecord(
+    guidance?.best_next_thing,
+    guidance?.bestNextThing,
+    guidance?.next_best_thing,
+    guidance?.nextBestThing,
+    payload?.best_next_thing,
+    payload?.bestNextThing,
+    payload?.next_best_thing,
+    payload?.nextBestThing,
+    actions?.best_next_thing,
+    actions?.bestNextThing,
+    actions?.next_best_thing,
+    actions?.nextBestThing
+  )
+
+  const bestNextLine = bestNext
+    ? pickString(
+        bestNext.next_line,
+        bestNext.nextLine,
+        bestNext.best_next_line,
+        bestNext.bestNextLine,
+        bestNext.line,
+        bestNext.text,
+        bestNext.guidance,
+        bestNext.statement,
+        bestNext.message,
+        bestNext.prompt
+      )
+    : undefined
 
   const nextLineSource =
     pickString(
@@ -286,10 +369,23 @@ const mapProposal = (payload: any, raw: string): Proposal => {
       payload?.next_best_line,
       actions?.nextbest_line,
       actions?.nextBestLine,
-      actions?.next_best_line
+      actions?.next_best_line,
+      bestNextLine
     ) || raw
 
-  const rationaleSource = pickString(guidance?.rationale, payload?.rationale) || ''
+  const bestNextRationale = bestNext
+    ? pickString(
+        bestNext.rationale,
+        bestNext.reason,
+        bestNext.reasoning,
+        bestNext.why,
+        bestNext.context,
+        bestNext.explanation
+      )
+    : undefined
+
+  const rationaleSource =
+    pickString(guidance?.rationale, payload?.rationale, bestNextRationale) || ''
 
   const followupSource =
     guidance?.suggested_followups ??
@@ -307,6 +403,51 @@ const mapProposal = (payload: any, raw: string): Proposal => {
     actions?.nextBestFollowups ??
     actions?.next_best_followups
 
+  const bestNextFollowups = bestNext
+    ? collectTextSnippets(
+        bestNext.followups,
+        bestNext.suggested_followups,
+        bestNext.next_questions,
+        bestNext.nextQuestions,
+        bestNext.questions,
+        bestNext.follow_up_questions,
+        bestNext.followUpQuestions,
+        bestNext.asks
+      )
+    : []
+
+  const extraGuidanceFollowups = collectTextSnippets(
+    guidance?.capture_outcome,
+    guidance?.captureOutcome,
+    guidance?.confirm_success,
+    guidance?.confirmSuccess,
+    guidance?.validate_success_metrics,
+    guidance?.validateSuccessMetrics,
+    guidance?.reinforce_value,
+    guidance?.reinforceValue,
+    guidance?.highlight_reason_to_partner,
+    guidance?.highlightReasonToPartner,
+    actions?.capture_outcome,
+    actions?.captureOutcome,
+    actions?.confirm_success,
+    actions?.confirmSuccess,
+    actions?.validate_success_metrics,
+    actions?.validateSuccessMetrics
+  )
+
+  const normalizedFollowups = Array.from(
+    new Set(
+      [
+        ...coerceStringArray(followupSource),
+        ...collectTextSnippets(followupSource),
+        ...bestNextFollowups,
+        ...extraGuidanceFollowups
+      ]
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0)
+    )
+  )
+
   const expectedRaw =
     guidance?.expected_customer_reply_type ??
     guidance?.expectedCustomerReplyType ??
@@ -316,7 +457,16 @@ const mapProposal = (payload: any, raw: string): Proposal => {
     payload?.expected_nextbest_reply_type ??
     actions?.expected_customer_reply_type ??
     actions?.expectedCustomerReplyType ??
-    actions?.expected_nextbest_reply_type
+    actions?.expected_nextbest_reply_type ??
+    (typeof bestNext?.expected_customer_reply_type === 'string'
+      ? bestNext.expected_customer_reply_type
+      : typeof bestNext?.expectedCustomerReplyType === 'string'
+      ? bestNext.expectedCustomerReplyType
+      : typeof bestNext?.expected_reply_type === 'string'
+      ? bestNext.expected_reply_type
+      : typeof bestNext?.expectedReplyType === 'string'
+      ? bestNext.expectedReplyType
+      : undefined)
 
   const expected: Proposal['expectedCustomerReplyType'] =
     expectedRaw === 'yes_no' || expectedRaw === 'narrative' || expectedRaw === 'selection'
@@ -339,8 +489,14 @@ const mapProposal = (payload: any, raw: string): Proposal => {
   }
 
   const checklistItems = mergeChecklistItems(
-    [payload?.checklist, guidance?.checklist, actions?.update_checklist]
-      .flatMap((source) => coerceChecklistItems(source))
+    [
+      payload?.checklist,
+      guidance?.checklist,
+      actions?.update_checklist,
+      bestNext?.checklist,
+      bestNext?.checklist_updates,
+      bestNext?.checklistUpdates
+    ].flatMap((source) => coerceChecklistItems(source))
   )
 
   const goalsProgress = Array.from(
@@ -351,7 +507,11 @@ const mapProposal = (payload: any, raw: string): Proposal => {
         ...coerceStringArray(guidance?.goal_progress),
         ...extractCompletedFromRecord(guidance?.goals_progress),
         ...extractCompletedFromRecord(guidance?.goal_progress),
-        ...extractCompletedFromRecord(actions?.update_goal_progress)
+        ...extractCompletedFromRecord(actions?.update_goal_progress),
+        ...coerceStringArray(bestNext?.goals_progress),
+        ...coerceStringArray(bestNext?.goal_progress),
+        ...collectTextSnippets(bestNext?.goals_progress),
+        ...collectTextSnippets(bestNext?.goal_progress)
       ]
         .map((item) => item.trim())
         .filter((item) => item.length > 0)
@@ -364,7 +524,7 @@ const mapProposal = (payload: any, raw: string): Proposal => {
     goalsProgress,
     expectedCustomerReplyType: expected,
     objection: objectionPayload,
-    followups: coerceStringArray(followupSource),
+    followups: normalizedFollowups,
     checklist: checklistItems,
     raw
   }
