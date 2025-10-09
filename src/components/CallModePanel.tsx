@@ -12,7 +12,12 @@ import {
 import { createQuestionCard, initializeFieldState } from '../lib/questions'
 import { quickTags } from '../lib/tags'
 import { createId } from '../lib/id'
-import { findNextGridPositionWithOverflow } from '../lib/canvasLayout'
+import {
+  DEFAULT_CARD_HEIGHT,
+  DEFAULT_CARD_WIDTH,
+  getNextCardPosition,
+  toPlacementRects
+} from '../lib/canvasLayout'
 import { StoreContext } from '../App'
 import { personalizeAgentText } from '../lib/personalization'
 
@@ -318,9 +323,19 @@ export default function CallModePanel({
     [handleJumpToQuestion]
   )
 
+  const computeNextPlacement = useCallback(() => {
+    const rects = toPlacementRects(canvas.cards)
+    const position = getNextCardPosition({ w: DEFAULT_CARD_WIDTH, h: DEFAULT_CARD_HEIGHT }, rects)
+    const maxBottom = rects.length
+      ? rects.reduce((max, rect) => Math.max(max, rect.y + rect.h), Number.NEGATIVE_INFINITY)
+      : position.y + DEFAULT_CARD_HEIGHT
+    const overflowed = rects.length > 0 && position.y + DEFAULT_CARD_HEIGHT > maxBottom
+    return { position, overflowed }
+  }, [canvas.cards])
+
   const handleSubmit = () => {
     if (!currentQuestion || !currentSection) return
-    const { position, overflowed } = findNextGridPositionWithOverflow(canvas.cards)
+    const { position, overflowed } = computeNextPlacement()
     const variantForCard: QuestionVariant =
       currentVariant ?? { id: `${currentQuestion.id}-default`, text: currentQuestion.label, tone: 'warm' }
     const trimmedAnswer = answer.trim()
@@ -401,7 +416,7 @@ export default function CallModePanel({
       .map((tag) => tag.trim().toLowerCase())
       .filter(Boolean)
     const normalizedTags = Array.from(new Set(['freeform', ...inputTags]))
-    const { position, overflowed } = findNextGridPositionWithOverflow(canvas.cards)
+    const { position, overflowed } = computeNextPlacement()
     const now = new Date().toISOString()
     const freeformCard: Card = {
       id: createId('card'),

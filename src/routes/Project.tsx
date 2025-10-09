@@ -4,7 +4,12 @@ import { PlusIcon, ArrowLeftIcon } from '@heroicons/react/24/outline'
 import { StoreContext } from '../App'
 import { strings } from '../lib/i18n'
 import { createEmptyCanvas } from '../lib/storage'
-import { findNextGridPosition } from '../lib/canvasLayout'
+import {
+  DEFAULT_CARD_HEIGHT,
+  DEFAULT_CARD_WIDTH,
+  getNextCardPosition,
+  toPlacementRects
+} from '../lib/canvasLayout'
 import { createQuestionCard } from '../lib/questions'
 import { personalizeAgentText } from '../lib/personalization'
 
@@ -195,7 +200,10 @@ export default function ProjectRoute() {
                             onClick={() => {
                               if (!project.canvases[0]) return
                               const canvas = project.canvases[0]
-                              const position = findNextGridPosition(canvas.cards)
+                              const position = getNextCardPosition(
+                                { w: DEFAULT_CARD_WIDTH, h: DEFAULT_CARD_HEIGHT },
+                                toPlacementRects(canvas.cards)
+                              )
                               const card = createQuestionCard({ question, variant, position })
                               store.addCard(project.id, canvas.id, card)
                             }}
