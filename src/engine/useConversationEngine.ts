@@ -649,13 +649,21 @@ export function useConversationEngine({
       const proposal = parsed
         ? mapProposal(payload, rawForProposal)
         : mapProposal({ next_line: fallbackNextLine }, rawForProposal)
-      setCurrentProposal(proposal)
-      proposalRef.current = proposal
+      const resolvedNextLine = proposal.nextLine.trim().length
+        ? proposal.nextLine
+        : fallbackNextLine.trim()
+      const normalizedProposal = resolvedNextLine === proposal.nextLine
+        ? proposal
+        : { ...proposal, nextLine: resolvedNextLine }
+      setCurrentProposal(normalizedProposal)
+      proposalRef.current = normalizedProposal
       setStreamingNextLine('')
 
       setGoals((prev) => {
-        if (!proposal.goalsProgress.length) return prev
-        const accomplished = new Set(proposal.goalsProgress.map((item) => item.toLowerCase()))
+        if (!normalizedProposal.goalsProgress.length) return prev
+        const accomplished = new Set(
+          normalizedProposal.goalsProgress.map((item) => item.toLowerCase())
+        )
         const next = prev.map((goal) =>
           accomplished.has(goal.name.toLowerCase()) ? { ...goal, done: true } : goal
         )
@@ -663,13 +671,13 @@ export function useConversationEngine({
         return next
       })
 
-      if (proposal.checklist.length) {
+      if (normalizedProposal.checklist.length) {
         setChecklist((prev) => {
           const map = new Map<string, ChecklistItemState>()
           prev.forEach((item) => {
             map.set(item.name.toLowerCase(), { ...item })
           })
-          proposal.checklist.forEach((item) => {
+          normalizedProposal.checklist.forEach((item) => {
             const key = item.name.toLowerCase()
             const existing = map.get(key)
             if (existing) {
@@ -684,21 +692,21 @@ export function useConversationEngine({
         })
       }
 
-      const assistantSentiment = analyzeWithVader(proposal.nextLine)
+      const assistantSentiment = analyzeWithVader(normalizedProposal.nextLine)
       const assistantEntry: ConversationTurn = {
         id: createId('assistant-turn'),
         role: 'assistant',
-        text: proposal.nextLine,
+        text: normalizedProposal.nextLine,
         timestamp: new Date().toISOString(),
         sentiment: assistantSentiment,
         metadata: {
-          proposal
+          proposal: normalizedProposal
         }
       }
 
       setHistory((prev) => {
         const next = appendEntry(prev, assistantEntry)
-        if (proposal.objection.detected && proposal.objection.category) {
+        if (normalizedProposal.objection.detected && normalizedProposal.objection.category) {
           for (let i = next.length - 1; i >= 0; i--) {
             const turn = next[i]
             if (turn.id === assistantEntry.id) continue
@@ -706,7 +714,10 @@ export function useConversationEngine({
               const existingMeta = turn.metadata ?? {}
               next[i] = {
                 ...turn,
-                metadata: { ...existingMeta, objectionCategory: proposal.objection.category }
+                metadata: {
+                  ...existingMeta,
+                  objectionCategory: normalizedProposal.objection.category
+                }
               }
               break
             }
@@ -716,12 +727,12 @@ export function useConversationEngine({
         return next
       })
 
-      if (assistantSentiment === null && proposal.nextLine) {
-        void enhanceSentiment(assistantEntry.id, proposal.nextLine)
+      if (assistantSentiment === null && normalizedProposal.nextLine) {
+        void enhanceSentiment(assistantEntry.id, normalizedProposal.nextLine)
       }
 
       setLoading(false)
-      return proposal
+      return normalizedProposal
     },
     [contextSignals, enhanceSentiment, objectionLibrary, persona, plan, script]
   )
