@@ -150,6 +150,8 @@ export default function CanvasRoute() {
       priority: 'medium' as const,
       x: position.x,
       y: position.y,
+      width: DEFAULT_CARD_WIDTH,
+      height: DEFAULT_CARD_HEIGHT,
       createdAt: now,
       updatedAt: now
     }
@@ -210,6 +212,8 @@ export default function CanvasRoute() {
       priority: 'medium',
       x: position.x,
       y: position.y,
+      width: DEFAULT_CARD_WIDTH,
+      height: DEFAULT_CARD_HEIGHT,
       createdAt: now,
       updatedAt: now,
       markdown: false

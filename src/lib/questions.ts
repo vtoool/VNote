@@ -7,6 +7,7 @@ import {
   ScriptQuestion
 } from './storage'
 import { createId } from './id'
+import { DEFAULT_CARD_HEIGHT, DEFAULT_CARD_WIDTH } from './canvasLayout'
 
 function cloneFieldValue(value: FieldValue): FieldValue {
   if (Array.isArray(value)) {
@@ -88,6 +89,8 @@ export function createQuestionCard({
     priority: 'medium',
     x: position?.x ?? 0,
     y: position?.y ?? 0,
+    width: DEFAULT_CARD_WIDTH,
+    height: DEFAULT_CARD_HEIGHT,
     createdAt: now,
     updatedAt: now
   }

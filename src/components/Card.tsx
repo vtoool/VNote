@@ -1,10 +1,11 @@
-import { useContext, useEffect, useRef, useState } from 'react'
+import { ChangeEvent, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { PencilSquareIcon } from '@heroicons/react/24/outline'
 import { Card, QuestionFieldState } from '../lib/storage'
 import { createId } from '../lib/id'
 import { quickTags } from '../lib/tags'
 import { StoreContext } from '../App'
 import { personalizeAgentText } from '../lib/personalization'
+import { DEFAULT_CARD_HEIGHT, GRID_SPACING } from '../lib/canvasLayout'
 
 interface CardProps {
   card: Card
@@ -21,7 +22,10 @@ export default function CardComponent({ card, onChange, onDelete }: CardProps) {
   const [titleDraft, setTitleDraft] = useState(card.title)
   const titleInputRef = useRef<HTMLInputElement>(null)
 
-  const baseClasses = 'flex max-h-[28rem] w-auto min-w-[16rem] max-w-[28rem] flex-col overflow-hidden rounded-3xl border border-white/70 bg-white/90 p-4 text-sm shadow-soft dark:border-slate-800/70 dark:bg-slate-900/80'
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  const baseClasses =
+    'flex h-full w-full min-w-[16rem] flex-col overflow-hidden rounded-3xl border border-white/70 bg-white/90 p-4 text-sm shadow-soft dark:border-slate-800/70 dark:bg-slate-900/80'
 
   useEffect(() => {
     setTitleDraft(card.title)
@@ -47,6 +51,12 @@ export default function CardComponent({ card, onChange, onDelete }: CardProps) {
   const toggleTag = (tag: string) => {
     const tags = card.tags.includes(tag) ? card.tags.filter((t) => t !== tag) : [...card.tags, tag]
     onChange({ ...card, tags, updatedAt: new Date().toISOString() })
+  }
+
+  const resizeTextarea = (element: HTMLTextAreaElement | null) => {
+    if (!element) return
+    element.style.height = 'auto'
+    element.style.height = `${element.scrollHeight}px`
   }
 
   const updateField = (fieldId: string, value: QuestionFieldState['value']) => {
@@ -168,9 +178,12 @@ export default function CardComponent({ card, onChange, onDelete }: CardProps) {
             <textarea
               id={field.id}
               value={typeof field.value === 'string' ? field.value : ''}
-              onChange={(event) => updateField(field.id, event.target.value)}
+              onChange={(event) => {
+                resizeTextarea(event.target)
+                updateField(field.id, event.target.value)
+              }}
               placeholder={field.placeholder}
-              className="h-20 w-full rounded-2xl border border-indigo-300/40 bg-white/80 p-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:border-slate-700/50 dark:bg-slate-900/60"
+              className="min-h-[5rem] w-full resize-none overflow-hidden rounded-2xl border border-indigo-300/40 bg-white/80 p-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:border-slate-700/50 dark:bg-slate-900/60"
             />
           </div>
         )
@@ -218,8 +231,33 @@ export default function CardComponent({ card, onChange, onDelete }: CardProps) {
     return field.value ? String(field.value) : '—'
   }
 
+  useLayoutEffect(() => {
+    if (card.type === 'media') return
+    const node = rootRef.current
+    if (!node) return
+
+    node.querySelectorAll('textarea').forEach((element) => {
+      resizeTextarea(element as HTMLTextAreaElement)
+    })
+
+    const measuredHeight = Math.round(node.scrollHeight)
+    const snappedHeight = Math.max(
+      DEFAULT_CARD_HEIGHT,
+      Math.ceil(measuredHeight / GRID_SPACING) * GRID_SPACING
+    )
+    const currentHeight = card.height ?? DEFAULT_CARD_HEIGHT
+    if (Math.abs(currentHeight - snappedHeight) >= GRID_SPACING / 2) {
+      onChange({ ...card, height: snappedHeight, updatedAt: new Date().toISOString() })
+    }
+  }, [card, onChange])
+
+  const handleContentChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    resizeTextarea(event.target)
+    onChange({ ...card, content: event.target.value, updatedAt: new Date().toISOString() })
+  }
+
   return (
-    <div className={baseClasses} data-card-root="true">
+    <div ref={rootRef} className={baseClasses} data-card-root="true">
       <div className="mb-2 flex items-start justify-between gap-2">
         {editingTitle ? (
           <input
@@ -292,130 +330,129 @@ export default function CardComponent({ card, onChange, onDelete }: CardProps) {
         </div>
       </div>
 
-      <div className="mt-3 flex-1 overflow-y-auto pr-1" style={{ touchAction: 'pan-y' }}>
-        <div className="space-y-3">
-          {showPersonalizedPreview && (
-            <div className="rounded-2xl bg-indigo-500/10 px-3 py-2 text-xs text-indigo-600 dark:bg-slate-900/60 dark:text-indigo-200">
-              <p className="font-semibold">Personalized preview</p>
-              <p>{personalizedContent}</p>
-            </div>
-          )}
-          <textarea
-            value={card.content}
-            onChange={(event) => onChange({ ...card, content: event.target.value, updatedAt: new Date().toISOString() })}
-            disabled={card.locked}
-            className="min-h-[6rem] w-full resize-y rounded-2xl border border-transparent bg-slate-100/50 p-2 text-sm focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:bg-slate-800/60"
-          />
+      <div className="mt-3 space-y-3" style={{ touchAction: 'pan-y' }}>
+        {showPersonalizedPreview && (
+          <div className="rounded-2xl bg-indigo-500/10 px-3 py-2 text-xs text-indigo-600 dark:bg-slate-900/60 dark:text-indigo-200">
+            <p className="font-semibold">Personalized preview</p>
+            <p>{personalizedContent}</p>
+          </div>
+        )}
 
-          {card.type === 'checklist' && (
-            <div className="space-y-2">
-              <ul className="space-y-2">
-                {card.checklist.map((item) => (
-                  <li key={item.id} className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={item.completed}
-                      onChange={(event) => {
-                        const next = card.checklist.map((entry) =>
-                          entry.id === item.id ? { ...entry, completed: event.target.checked } : entry
-                        )
-                        onChange({ ...card, checklist: next, updatedAt: new Date().toISOString() })
-                      }}
-                      className="rounded border-slate-300 text-indigo-500 focus:ring-indigo-400"
-                    />
-                    <input
-                      value={item.text}
-                      onChange={(event) => {
-                        const next = card.checklist.map((entry) =>
-                          entry.id === item.id ? { ...entry, text: event.target.value } : entry
-                        )
-                        onChange({ ...card, checklist: next, updatedAt: new Date().toISOString() })
-                      }}
-                      disabled={card.locked}
-                      className="flex-1 rounded-2xl border border-transparent bg-white/70 px-2 py-1 text-sm focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:bg-slate-800/60"
-                    />
-                  </li>
-                ))}
-              </ul>
-              <button
-                onClick={() =>
-                  onChange({
-                    ...card,
-                    checklist: [...card.checklist, { id: createId('item'), text: 'New item', completed: false }],
-                    updatedAt: new Date().toISOString()
-                  })
-                }
-                className="rounded-2xl bg-indigo-500/10 px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-500/20 dark:text-indigo-200"
-              >
-                Add item
-              </button>
-            </div>
-          )}
+        <textarea
+          value={card.content}
+          onChange={handleContentChange}
+          disabled={card.locked}
+          className="min-h-[6rem] w-full resize-none overflow-hidden rounded-2xl border border-transparent bg-slate-100/50 p-2 text-sm focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:bg-slate-800/60"
+        />
 
-          {card.type === 'question' && (
-            <div className="space-y-3 text-xs">
-              {card.fields?.length ? (
-                <div className="space-y-3">
-                  {card.fields.map((field) => (
-                    <div key={field.id} className="space-y-1">
-                      {renderField(field)}
-                      {field.description && (
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400">{field.description}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-              <input
-                value={card.answer}
-                onChange={(event) => onChange({ ...card, answer: event.target.value, updatedAt: new Date().toISOString() })}
-                placeholder="Add quick summary / headline"
-                disabled={card.locked}
-                className="w-full rounded-2xl border border-indigo-300/40 bg-indigo-500/10 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-              />
-              <div className="flex flex-wrap gap-2 text-[10px] uppercase tracking-wide text-slate-500">
-                {quickTags.map((tag) => (
-                  <button
-                    key={tag}
-                    onClick={() => toggleTag(tag)}
-                    className={`rounded-full px-2 py-1 ${card.tags.includes(tag) ? 'bg-indigo-500 text-white' : 'bg-indigo-100 text-indigo-600'}`}
-                  >
-                    {tag}
-                  </button>
+        {card.type === 'checklist' && (
+          <div className="space-y-2">
+            <ul className="space-y-2">
+              {card.checklist.map((item) => (
+                <li key={item.id} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={item.completed}
+                    onChange={(event) => {
+                      const next = card.checklist.map((entry) =>
+                        entry.id === item.id ? { ...entry, completed: event.target.checked } : entry
+                      )
+                      onChange({ ...card, checklist: next, updatedAt: new Date().toISOString() })
+                    }}
+                    className="rounded border-slate-300 text-indigo-500 focus:ring-indigo-400"
+                  />
+                  <input
+                    value={item.text}
+                    onChange={(event) => {
+                      const next = card.checklist.map((entry) =>
+                        entry.id === item.id ? { ...entry, text: event.target.value } : entry
+                      )
+                      onChange({ ...card, checklist: next, updatedAt: new Date().toISOString() })
+                    }}
+                    disabled={card.locked}
+                    className="flex-1 rounded-2xl border border-transparent bg-white/70 px-2 py-1 text-sm focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-300 dark:bg-slate-800/60"
+                  />
+                </li>
+              ))}
+            </ul>
+            <button
+              onClick={() =>
+                onChange({
+                  ...card,
+                  checklist: [...card.checklist, { id: createId('item'), text: 'New item', completed: false }],
+                  updatedAt: new Date().toISOString()
+                })
+              }
+              className="rounded-2xl bg-indigo-500/10 px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-500/20 dark:text-indigo-200"
+            >
+              Add item
+            </button>
+          </div>
+        )}
+
+        {card.type === 'question' && (
+          <div className="space-y-3 text-xs">
+            {card.fields?.length ? (
+              <div className="space-y-3">
+                {card.fields.map((field) => (
+                  <div key={field.id} className="space-y-1">
+                    {renderField(field)}
+                    {field.description && (
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">{field.description}</p>
+                    )}
+                  </div>
                 ))}
               </div>
+            ) : null}
+            <input
+              value={card.answer}
+              onChange={(event) => onChange({ ...card, answer: event.target.value, updatedAt: new Date().toISOString() })}
+              placeholder="Add quick summary / headline"
+              disabled={card.locked}
+              className="w-full rounded-2xl border border-indigo-300/40 bg-indigo-500/10 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            />
+            <div className="flex flex-wrap gap-2 text-[10px] uppercase tracking-wide text-slate-500">
+              {quickTags.map((tag) => (
+                <button
+                  key={tag}
+                  onClick={() => toggleTag(tag)}
+                  className={`rounded-full px-2 py-1 ${card.tags.includes(tag) ? 'bg-indigo-500 text-white' : 'bg-indigo-100 text-indigo-600'}`}
+                >
+                  {tag}
+                </button>
+              ))}
             </div>
-          )}
+          </div>
+        )}
 
-          {card.type === 'media' && (
-            <div className="space-y-2 text-xs">
-              <input
-                type="file"
-                accept="image/*"
-                disabled={card.locked}
-                onChange={async (event) => {
-                  const file = event.target.files?.[0]
-                  if (!file) return
-                  const reader = new FileReader()
-                  reader.onload = () => {
-                    onChange({ ...card, dataUrl: reader.result as string, updatedAt: new Date().toISOString() })
-                  }
-                  reader.readAsDataURL(file)
-                }}
-              />
-              {card.dataUrl && (
-                <img src={card.dataUrl} alt={card.description} className="w-full rounded-2xl object-cover" />
-              )}
-              <input
-                value={card.description}
-                onChange={(event) => onChange({ ...card, description: event.target.value, updatedAt: new Date().toISOString() })}
-                placeholder="Describe the media"
-                disabled={card.locked}
-                className="w-full rounded-2xl border border-indigo-300/40 bg-white/80 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:border-slate-700/50 dark:bg-slate-900/60"
-              />
-            </div>
-          )}
-        </div>
+        {card.type === 'media' && (
+          <div className="space-y-2 text-xs">
+            <input
+              type="file"
+              accept="image/*"
+              disabled={card.locked}
+              onChange={async (event) => {
+                const file = event.target.files?.[0]
+                if (!file) return
+                const reader = new FileReader()
+                reader.onload = () => {
+                  onChange({ ...card, dataUrl: reader.result as string, updatedAt: new Date().toISOString() })
+                }
+                reader.readAsDataURL(file)
+              }}
+            />
+            {card.dataUrl && (
+              <img src={card.dataUrl} alt={card.description} className="w-full rounded-2xl object-cover" />
+            )}
+            <input
+              value={card.description}
+              onChange={(event) => onChange({ ...card, description: event.target.value, updatedAt: new Date().toISOString() })}
+              placeholder="Describe the media"
+              disabled={card.locked}
+              className="w-full rounded-2xl border border-indigo-300/40 bg-white/80 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:border-slate-700/50 dark:bg-slate-900/60"
+            />
+          </div>
+        )}
       </div>
     </div>
   )
