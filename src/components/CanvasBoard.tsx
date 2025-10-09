@@ -145,6 +145,10 @@ export default function CanvasBoard({
     if (event.ctrlKey || event.metaKey) {
       return
     }
+
+    const container = containerRef.current
+    if (!container) return
+
     event.preventDefault()
     const zoomIntensity = 0.0015
     const current = latestCanvasRef.current
@@ -155,10 +159,24 @@ export default function CanvasBoard({
 
     if (nextZoom === current.zoom) return
 
+    const rect = container.getBoundingClientRect()
+    const canvasPoint = {
+      x: (event.clientX - rect.left - current.position.x) / current.zoom,
+      y: (event.clientY - rect.top - current.position.y) / current.zoom
+    }
+
+    const nextPosition = {
+      x: event.clientX - rect.left - canvasPoint.x * nextZoom,
+      y: event.clientY - rect.top - canvasPoint.y * nextZoom
+    }
+
     onChangeRef.current({
       ...current,
-      zoom: nextZoom
+      zoom: nextZoom,
+      position: nextPosition
     })
+
+    pointerCallbackRef.current?.(canvasPoint)
   }, [])
 
   useEffect(() => {
