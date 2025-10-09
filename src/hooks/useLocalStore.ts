@@ -20,6 +20,7 @@ import {
 } from '../lib/storage'
 import { builtInTemplates } from '../lib/templates'
 import { createId } from '../lib/id'
+import { getConversationStorageKey } from '../engine/useConversationEngine'
 import {
   DEFAULT_CARD_HEIGHT,
   DEFAULT_CARD_WIDTH,
@@ -102,6 +103,14 @@ const useZustandStore = create<LocalStore>()((set, get) => ({
     },
     deleteProject: (projectId) => {
       set({ projects: get().projects.filter((project) => project.id !== projectId), dirty: true })
+      if (typeof window !== 'undefined') {
+        try {
+          window.localStorage.removeItem(getConversationStorageKey(projectId))
+          window.localStorage.removeItem(getConversationStorageKey())
+        } catch (error) {
+          console.warn('Failed to remove stored conversation state', error)
+        }
+      }
     },
     duplicateProject: (projectId) => {
       const target = get().projects.find((project) => project.id === projectId)

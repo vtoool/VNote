@@ -179,6 +179,7 @@ export default function CallModePanel({
 }: CallModePanelProps) {
   const store = useContext(StoreContext)!
   const conversation = useConversationEngine({
+    projectId: project.id,
     script: project.script,
     personaName: store.settings.agentName
   })
