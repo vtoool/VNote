@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Rnd } from 'react-rnd'
 import { motion } from 'framer-motion'
 import { Card, Canvas } from '../lib/storage'
-import { GRID_SPACING, snapPointToGrid } from '../lib/canvasLayout'
+import { DEFAULT_CARD_WIDTH, GRID_SPACING, snapPointToGrid } from '../lib/canvasLayout'
 import CardComponent from './Card'
 
 const MIN_ZOOM = 0.4
@@ -253,42 +253,17 @@ export default function CanvasBoard({
               data-card-id={card.id}
               data-card-type={card.type}
               position={{ x: card.x, y: card.y }}
-              size={{ width: card.width ?? 'auto', height: card.height ?? 'auto' }}
+              size={{
+                width: card.width ?? DEFAULT_CARD_WIDTH,
+                height: card.height ?? 'auto'
+              }}
               scale={canvas.zoom}
               onDragStop={(event, data) => {
                 const snapped = snapPointToGrid({ x: data.x, y: data.y })
                 onCardChange({ ...card, x: snapped.x, y: snapped.y, updatedAt: new Date().toISOString() })
               }}
-              onResizeStop={(event, direction, ref, delta, position) => {
-                const snapped = snapPointToGrid({ x: position.x, y: position.y })
-                const nextWidth = Number.parseFloat(ref.style.width)
-                const nextHeight = Number.parseFloat(ref.style.height)
-                onCardChange({
-                  ...card,
-                  width: Number.isFinite(nextWidth) ? nextWidth : undefined,
-                  height: Number.isFinite(nextHeight) ? nextHeight : undefined,
-                  x: snapped.x,
-                  y: snapped.y,
-                  updatedAt: new Date().toISOString()
-                })
-              }}
-              enableResizing={!card.locked}
               disableDragging={card.locked}
               style={{ zIndex: card.pinned ? 20 : undefined }}
-              minWidth={200}
-              minHeight={160}
-              resizeHandleStyles={{
-                bottomRight: {
-                  width: '22px',
-                  height: '22px',
-                  borderRadius: '9999px',
-                  border: '1px solid rgba(255,255,255,0.65)',
-                  background: 'linear-gradient(135deg, rgba(129,140,248,0.95), rgba(99,102,241,0.95))',
-                  right: '10px',
-                  bottom: '10px',
-                  boxShadow: '0 8px 16px rgba(79,70,229,0.35), inset 0 1px 2px rgba(255,255,255,0.6)'
-                }
-              }}
             >
               <CardComponent card={card} onChange={onCardChange} onDelete={() => onCardDelete(card.id)} />
             </Rnd>
