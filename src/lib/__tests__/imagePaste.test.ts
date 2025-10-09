@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { installImagePasteHandler } from '../imagePaste'
 
 const originalClipboard = navigator.clipboard
+const hadOriginalClipboard = typeof originalClipboard !== 'undefined'
 
 function createClipboardEvent(dataTransfer: Partial<DataTransfer>): ClipboardEvent {
   const event = new Event('paste') as ClipboardEvent
@@ -24,23 +25,19 @@ describe('installImagePasteHandler', () => {
     })
   })
 
-    afterEach(() => {
-      if (originalClipboard) {
-        Object.defineProperty(navigator, 'clipboard', {
-          value: originalClipboard,
-          configurable: true
-        })
-      } else {
-        delete (navigator as Navigator & { clipboard?: Clipboard }).clipboard
-      }
+  afterEach(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      value: hadOriginalClipboard ? originalClipboard : undefined,
+      configurable: true
     })
+  })
 
   it('invokes onImages when clipboard files include an image', async () => {
     const file = new File(['data'], 'image.png', { type: 'image/png' })
     const onImages = vi.fn()
     const cleanup = installImagePasteHandler({ onImages })
 
-    const event = createClipboardEvent({ files: [file], items: [] } as DataTransfer)
+    const event = createClipboardEvent({ files: [file] as unknown as FileList, items: [] as unknown as DataTransferItemList })
     const preventDefault = vi.fn()
     event.preventDefault = preventDefault
 
@@ -67,7 +64,7 @@ describe('installImagePasteHandler', () => {
       { kind: 'file', type: 'image/jpeg', getAsFile: () => jpeg }
     ] as unknown as DataTransferItemList
 
-    const event = createClipboardEvent({ files: [] as unknown as FileList, items } as DataTransfer)
+    const event = createClipboardEvent({ files: [] as unknown as FileList, items })
     const preventDefault = vi.fn()
     event.preventDefault = preventDefault
 
@@ -87,7 +84,7 @@ describe('installImagePasteHandler', () => {
     const onNoImage = vi.fn()
     const cleanup = installImagePasteHandler({ onImages, onNoImage })
 
-    const event = createClipboardEvent({ files: [] as unknown as FileList, items: [] as unknown as DataTransferItemList } as DataTransfer)
+    const event = createClipboardEvent({ files: [] as unknown as FileList, items: [] as unknown as DataTransferItemList })
     const preventDefault = vi.fn()
     event.preventDefault = preventDefault
 

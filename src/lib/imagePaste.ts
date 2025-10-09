@@ -125,10 +125,8 @@ export async function getImageDimensions(blob: Blob): Promise<{ width: number; h
     try {
       const bitmap = await createImageBitmap(blob)
       const dimensions = { width: bitmap.width, height: bitmap.height }
-      if ('close' in bitmap) {
-        // @ts-expect-error close is not universally defined but supported in modern browsers
-        bitmap.close()
-      }
+      const closable = bitmap as ImageBitmap & { close?: () => void }
+      closable.close?.()
       return dimensions
     } catch {
       // fall through to DOM image approach
