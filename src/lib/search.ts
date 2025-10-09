@@ -1,5 +1,6 @@
 import Fuse from 'fuse.js'
 import { Project } from './storage'
+import { personalizeAgentText } from './personalization'
 
 export interface SearchResult {
   projectId: string
@@ -9,7 +10,7 @@ export interface SearchResult {
   preview: string
 }
 
-export function buildSearchIndex(projects: Project[]) {
+export function buildSearchIndex(projects: Project[], agentName: string) {
   const entries: SearchResult[] = []
   projects.forEach((project) => {
     entries.push({ projectId: project.id, path: `Project • ${project.name}`, preview: project.tags.join(', ') })
@@ -21,7 +22,7 @@ export function buildSearchIndex(projects: Project[]) {
           canvasId: canvas.id,
           cardId: card.id,
           path: `${project.name} › ${canvas.name} › ${card.title || card.type}`,
-          preview: `${card.content}\n${card.tags.join(', ')}`
+          preview: `${personalizeAgentText(card.content ?? '', agentName)}\n${card.tags.join(', ')}`
         })
       })
     })
@@ -35,8 +36,8 @@ export function buildSearchIndex(projects: Project[]) {
   return { fuse, entries }
 }
 
-export function search(projects: Project[], term: string): SearchResult[] {
+export function search(projects: Project[], term: string, agentName: string): SearchResult[] {
   if (!term.trim()) return []
-  const { fuse } = buildSearchIndex(projects)
+  const { fuse } = buildSearchIndex(projects, agentName)
   return fuse.search(term).slice(0, 15).map((result) => result.item)
 }

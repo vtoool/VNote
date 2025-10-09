@@ -1,4 +1,7 @@
+import { useContext } from 'react'
 import { Project, QuestionVariant, ScriptQuestion } from '../lib/storage'
+import { StoreContext } from '../App'
+import { personalizeAgentText } from '../lib/personalization'
 
 interface ScriptPanelProps {
   project: Project
@@ -6,6 +9,8 @@ interface ScriptPanelProps {
 }
 
 export default function ScriptPanel({ project, onCaptureAnswer }: ScriptPanelProps) {
+  const store = useContext(StoreContext)!
+
   return (
     <aside className="glass-panel space-y-4 p-4 text-sm">
       <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Guided mode</h3>
@@ -53,7 +58,7 @@ export default function ScriptPanel({ project, onCaptureAnswer }: ScriptPanelPro
                         onClick={() => onCaptureAnswer(question, variant)}
                         className="w-full rounded-2xl bg-indigo-500/10 px-3 py-2 text-left text-xs text-indigo-600 transition hover:bg-indigo-500/20 dark:text-indigo-200"
                       >
-                        ✨ {variant.text}
+                        ✨ {personalizeAgentText(variant.text, store.settings.agentName)}
                       </button>
                     ))}
                   </div>

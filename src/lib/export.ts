@@ -1,9 +1,11 @@
 import { saveAs } from 'file-saver'
 import { Canvas, Card, Project, Template, QuestionFieldState } from './storage'
+import { personalizeAgentText } from './personalization'
 
-function formatCard(card: Card): string {
+function formatCard(card: Card, agentName: string): string {
   const header = `- [${card.type.toUpperCase()}] ${card.title || 'Untitled'}\n`
-  const body = card.content ? `  ${card.content.replace(/\n/g, '\n  ')}\n` : ''
+  const content = personalizeAgentText(card.content ?? '', agentName)
+  const body = content ? `  ${content.replace(/\n/g, '\n  ')}\n` : ''
   let extra = ''
   if (card.type === 'checklist') {
     extra = card.checklist.map((item) => `  - [${item.completed ? 'x' : ' '}] ${item.text}`).join('\n')
@@ -247,7 +249,8 @@ export function exportProjectToJson(project: Project) {
   saveAs(blob, `${project.name.replace(/\s+/g, '-')}-${new Date().toISOString()}.json`)
 }
 
-export function exportProjectToText(project: Project) {
+export function exportProjectToText(project: Project, options: { agentName?: string } = {}) {
+  const agentName = options.agentName ?? ''
   const lines: string[] = []
   lines.push(`# ${project.name}`)
   lines.push(`Last updated: ${new Date(project.updatedAt).toLocaleString()}`)
@@ -264,7 +267,7 @@ export function exportProjectToText(project: Project) {
       lines.push(`### Frame: ${frame.name}`)
     })
     canvas.cards.forEach((card) => {
-      lines.push(formatCard(card))
+      lines.push(formatCard(card, agentName))
     })
     lines.push('')
   })

@@ -189,13 +189,21 @@ export interface Project {
   accent: 'indigo' | 'violet'
 }
 
+export interface UserSettings {
+  agentName: string
+}
+
 export interface StoreState {
   projects: Project[]
   templates: Template[]
+  settings: UserSettings
   lastSavedAt?: string
 }
 
 const STORAGE_KEY = 'vnote-projects'
+const DEFAULT_SETTINGS: UserSettings = {
+  agentName: 'Alex'
+}
 
 localforage.config({
   name: 'vnote',
@@ -230,7 +238,12 @@ export async function loadStore(): Promise<StoreState> {
   const stored = await localforage.getItem<StoreState>(STORAGE_KEY)
   if (stored) {
     const mergedTemplates = mergeWithBuiltInTemplates(stored.templates)
-    const updatedStore: StoreState = { ...stored, templates: mergedTemplates }
+    const settings = stored.settings ?? DEFAULT_SETTINGS
+    const updatedStore: StoreState = {
+      ...stored,
+      templates: mergedTemplates,
+      settings
+    }
     const templatesChanged =
       JSON.stringify(mergedTemplates) !== JSON.stringify(stored.templates)
 
@@ -250,6 +263,7 @@ export async function loadStore(): Promise<StoreState> {
   return {
     projects: [seedProject],
     templates: builtInTemplates,
+    settings: DEFAULT_SETTINGS,
     lastSavedAt: now
   }
 }

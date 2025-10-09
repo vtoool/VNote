@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import CanvasBoard from './CanvasBoard'
 import {
   Card,
@@ -13,6 +13,8 @@ import { createQuestionCard, initializeFieldState } from '../lib/questions'
 import { quickTags } from '../lib/tags'
 import { createId } from '../lib/id'
 import { findNextGridPositionWithOverflow } from '../lib/canvasLayout'
+import { StoreContext } from '../App'
+import { personalizeAgentText } from '../lib/personalization'
 
 interface CallModePanelProps {
   project: Project
@@ -164,6 +166,8 @@ export default function CallModePanel({
   onCardDelete,
   onClose
 }: CallModePanelProps) {
+  const store = useContext(StoreContext)!
+  const agentName = store.settings.agentName
   const sections = project.script.sections
   const totalQuestions = useMemo(
     () => sections.reduce((count, section) => count + section.questions.length, 0),
@@ -518,7 +522,7 @@ export default function CallModePanel({
                               onChange={() => setSelectedVariantId(variant.id)}
                               className="mt-1"
                             />
-                            <span>✨ {variant.text}</span>
+                            <span>✨ {personalizeAgentText(variant.text, agentName)}</span>
                           </label>
                         ))}
                       </div>
@@ -890,7 +894,9 @@ export default function CallModePanel({
                         )}
                       </div>
                       {entry.type === 'question' && entry.variantText && (
-                        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Prompt: {entry.variantText}</p>
+                        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                          Prompt: {personalizeAgentText(entry.variantText, agentName)}
+                        </p>
                       )}
                       {entry.type === 'question' && !entry.skipped && entry.answer && (
                         <p className="mt-2 rounded-2xl bg-indigo-500/5 p-2 text-sm text-slate-700 dark:bg-slate-800/60 dark:text-slate-200">

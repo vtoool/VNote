@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import { PencilSquareIcon } from '@heroicons/react/24/outline'
 import { Card, QuestionFieldState } from '../lib/storage'
 import { createId } from '../lib/id'
 import { quickTags } from '../lib/tags'
+import { StoreContext } from '../App'
+import { personalizeAgentText } from '../lib/personalization'
 
 interface CardProps {
   card: Card
@@ -11,6 +13,10 @@ interface CardProps {
 }
 
 export default function CardComponent({ card, onChange, onDelete }: CardProps) {
+  const store = useContext(StoreContext)!
+  const agentName = store.settings.agentName
+  const personalizedContent = personalizeAgentText(card.content, agentName)
+  const showPersonalizedPreview = personalizedContent !== card.content
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState(card.title)
   const titleInputRef = useRef<HTMLInputElement>(null)
@@ -288,6 +294,12 @@ export default function CardComponent({ card, onChange, onDelete }: CardProps) {
 
       <div className="mt-3 flex-1 overflow-y-auto pr-1" style={{ touchAction: 'pan-y' }}>
         <div className="space-y-3">
+          {showPersonalizedPreview && (
+            <div className="rounded-2xl bg-indigo-500/10 px-3 py-2 text-xs text-indigo-600 dark:bg-slate-900/60 dark:text-indigo-200">
+              <p className="font-semibold">Personalized preview</p>
+              <p>{personalizedContent}</p>
+            </div>
+          )}
           <textarea
             value={card.content}
             onChange={(event) => onChange({ ...card, content: event.target.value, updatedAt: new Date().toISOString() })}

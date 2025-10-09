@@ -40,7 +40,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           })
-          navigate(`/project/${projectId}/canvas/${canvasId}`)
+          navigate(`/workspace/project/${projectId}/canvas/${canvasId}`)
         }
       },
       {
@@ -63,7 +63,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
             updatedAt: new Date().toISOString(),
             checklist: []
           })
-          navigate(`/project/${projectId}/canvas/${canvasId}`)
+          navigate(`/workspace/project/${projectId}/canvas/${canvasId}`)
         }
       },
       {
@@ -87,7 +87,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
             answer: '',
             variants: [],
           })
-          navigate(`/project/${projectId}/canvas/${canvasId}`)
+          navigate(`/workspace/project/${projectId}/canvas/${canvasId}`)
         }
       },
       {
@@ -110,7 +110,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
             updatedAt: new Date().toISOString(),
             markdown: true
           })
-          navigate(`/project/${projectId}/canvas/${canvasId}`)
+          navigate(`/workspace/project/${projectId}/canvas/${canvasId}`)
         }
       },
       {
@@ -134,7 +134,7 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
             dataUrl: null,
             description: ''
           })
-          navigate(`/project/${projectId}/canvas/${canvasId}`)
+          navigate(`/workspace/project/${projectId}/canvas/${canvasId}`)
         }
       },
       {
@@ -143,14 +143,14 @@ export default function CommandPalette({ open, onClose }: CommandPaletteProps) {
           if (!projectId) return
           const canvas = store.addCanvas(projectId, { name: 'Frame Canvas' })
           if (canvas) {
-            navigate(`/project/${projectId}/canvas/${canvas.id}`)
+            navigate(`/workspace/project/${projectId}/canvas/${canvas.id}`)
           }
         }
       },
       {
         label: strings.commandToggleGuided,
         run: () => {
-          navigate(`/project/${projectId}`)
+          navigate(`/workspace/project/${projectId}`)
         }
       },
       {
