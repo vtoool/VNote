@@ -1,6 +1,7 @@
 export const GRID_SPACING = 56
-const DEFAULT_CARD_WIDTH = GRID_SPACING * 7
-const DEFAULT_CARD_HEIGHT = GRID_SPACING * 5
+
+export const DEFAULT_CARD_WIDTH = GRID_SPACING * 7
+export const DEFAULT_CARD_HEIGHT = GRID_SPACING * 5
 
 const BASE_HORIZONTAL_GAP = 16
 const BASE_VERTICAL_GAP = 16
@@ -8,8 +9,39 @@ const HORIZONTAL_GAP_FACTOR = 0.1
 const VERTICAL_GAP_FACTOR = 0.1
 const MIN_HORIZONTAL_GAP = 16
 const MAX_HORIZONTAL_GAP = 48
-const MIN_VERTICAL_GAP = 16
+const MIN_VERTICAL_GAP = 12
 const MAX_VERTICAL_GAP = 40
+
+const PLACEMENT_MARGIN = 8
+const DEBUG_LIMIT = 10
+
+let placementLogCount = 0
+
+export interface PlacementRect {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+export interface GridConfig {
+  size?: number
+  origin?: { x: number; y: number }
+  left?: number
+  top?: number
+}
+
+export interface CanvasSize {
+  width?: number
+  height?: number
+}
+
+interface Candidate {
+  x: number
+  y: number
+  w: number
+  h: number
+}
 
 export function snapValueToGrid(value: number): number {
   return Math.round(value / GRID_SPACING) * GRID_SPACING
@@ -22,36 +54,28 @@ export function snapPointToGrid(point: { x: number; y: number }): { x: number; y
   }
 }
 
-interface Positionable {
+export function toPlacementRect(positionable: {
   x: number
   y: number
   width?: number
   height?: number
+}): PlacementRect {
+  return {
+    x: positionable.x,
+    y: positionable.y,
+    w: normalizeDimension(positionable.width, DEFAULT_CARD_WIDTH),
+    h: normalizeDimension(positionable.height, DEFAULT_CARD_HEIGHT)
+  }
 }
 
-interface Rect {
-  x: number
-  y: number
-  width: number
-  height: number
+export function toPlacementRects(
+  positionables: Array<{ x: number; y: number; width?: number; height?: number }>
+): PlacementRect[] {
+  return positionables.map((item) => toPlacementRect(item))
 }
 
-interface MeasuredRect extends Rect {
-  marginX: number
-  marginY: number
-}
-
-interface PlacementOptions<T extends Positionable> {
-  cards: T[]
-  size?: { width?: number; height?: number }
-  origin?: { x: number; y: number }
-  canvasSize?: { width: number; height: number }
-  gridSpacing?: number
-}
-
-interface PlacementResult {
-  position: { x: number; y: number }
-  overflowed: boolean
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max)
 }
 
 function normalizeDimension(value: number | undefined, fallback: number) {
@@ -61,188 +85,155 @@ function normalizeDimension(value: number | undefined, fallback: number) {
   return Math.max(parsed, GRID_SPACING)
 }
 
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max)
+function computeAdaptiveGaps(w: number, h: number) {
+  const xGap = clamp(BASE_HORIZONTAL_GAP + HORIZONTAL_GAP_FACTOR * w, MIN_HORIZONTAL_GAP, MAX_HORIZONTAL_GAP)
+  const yGap = clamp(BASE_VERTICAL_GAP + VERTICAL_GAP_FACTOR * h, MIN_VERTICAL_GAP, MAX_VERTICAL_GAP)
+  return { xGap, yGap }
 }
 
-function computeAdaptiveGaps(width: number, height: number) {
-  const xGap = clamp(BASE_HORIZONTAL_GAP + HORIZONTAL_GAP_FACTOR * width, MIN_HORIZONTAL_GAP, MAX_HORIZONTAL_GAP)
-  const yGap = clamp(BASE_VERTICAL_GAP + VERTICAL_GAP_FACTOR * height, MIN_VERTICAL_GAP, MAX_VERTICAL_GAP)
-
+function expand(rect: Candidate, margin: number) {
   return {
-    xGap,
-    yGap,
-    marginX: xGap / 2,
-    marginY: yGap / 2
+    left: rect.x - margin,
+    right: rect.x + rect.w + margin,
+    top: rect.y - margin,
+    bottom: rect.y + rect.h + margin
   }
 }
 
-function toMeasuredRect(card: Positionable): MeasuredRect {
-  const width = normalizeDimension(card.width, DEFAULT_CARD_WIDTH)
-  const height = normalizeDimension(card.height, DEFAULT_CARD_HEIGHT)
-  const gaps = computeAdaptiveGaps(width, height)
-
-  return {
-    x: card.x,
-    y: card.y,
-    width,
-    height,
-    marginX: gaps.marginX,
-    marginY: gaps.marginY
-  }
-}
-
-function expandRect(rect: Rect, marginX: number, marginY: number): Rect {
-  return {
-    x: rect.x - marginX,
-    y: rect.y - marginY,
-    width: rect.width + marginX * 2,
-    height: rect.height + marginY * 2
-  }
-}
-
-function rectsOverlap(a: Rect, b: Rect): boolean {
+function overlaps(a: Candidate, b: Candidate, margin: number) {
+  const expandedA = expand(a, margin)
+  const expandedB = expand(b, margin)
   return !(
-    a.x + a.width <= b.x ||
-    b.x + b.width <= a.x ||
-    a.y + a.height <= b.y ||
-    b.y + b.height <= a.y
+    expandedA.right <= expandedB.left ||
+    expandedB.right <= expandedA.left ||
+    expandedA.bottom <= expandedB.top ||
+    expandedB.bottom <= expandedA.top
   )
 }
 
-function fitsAt(
-  position: { x: number; y: number },
-  size: { width: number; height: number },
-  spacing: { marginX: number; marginY: number },
-  existing: MeasuredRect[]
-): boolean {
-  const base = { x: position.x, y: position.y, width: size.width, height: size.height }
-  const candidate = expandRect(base, spacing.marginX, spacing.marginY)
-
-  for (const rect of existing) {
-    const expanded = expandRect(rect, rect.marginX, rect.marginY)
-    if (rectsOverlap(candidate, expanded)) {
-      return false
-    }
-
-    const horizontalMargin = Math.max(spacing.marginX, rect.marginX)
-    const verticalMargin = Math.max(spacing.marginY, rect.marginY)
-    const candidateWithSharedMargin = expandRect(base, horizontalMargin, verticalMargin)
-    const expandedExistingWithSharedMargin = expandRect(rect, horizontalMargin, verticalMargin)
-
-    if (rectsOverlap(candidateWithSharedMargin, expandedExistingWithSharedMargin)) {
-      return false
+function findCollision(candidate: Candidate, rects: PlacementRect[], margin: number): PlacementRect | null {
+  for (const rect of rects) {
+    if (overlaps(candidate, { x: rect.x, y: rect.y, w: rect.w, h: rect.h }, margin)) {
+      return rect
     }
   }
-
-  return true
+  return null
 }
 
-function resolvePlacement<T extends Positionable>({
-  cards,
-  size,
-  origin,
-  canvasSize,
-  gridSpacing
-}: PlacementOptions<T>): PlacementResult {
-  if (cards.length === 0) {
-    const startX = origin?.x ?? 0
-    const startY = origin?.y ?? 0
-    const snapped = snapPointToGrid({ x: startX, y: startY })
-    return { position: snapped, overflowed: false }
-  }
-
-  const spacing = gridSpacing ?? GRID_SPACING
-  const measuredCards = cards.map((card) => toMeasuredRect(card))
-
-  const width = normalizeDimension(size?.width, DEFAULT_CARD_WIDTH)
-  const height = normalizeDimension(size?.height, DEFAULT_CARD_HEIGHT)
-  const candidateSpacing = computeAdaptiveGaps(width, height)
-
-  const candidateSize = { width, height }
-  const columnSpan = Math.max(1, Math.ceil(width / DEFAULT_CARD_WIDTH))
-  const rowSpan = Math.max(1, Math.ceil(height / DEFAULT_CARD_HEIGHT))
-
-  const originX = origin?.x ?? 0
-  const originY = origin?.y ?? 0
-
-  let minCol = Math.floor(originX / spacing)
-  let maxCol = Math.ceil((originX + width) / spacing)
-  let minRow = Math.floor(originY / spacing)
-  let maxRow = Math.ceil((originY + height) / spacing)
-
-  for (const rect of measuredCards) {
-    minCol = Math.min(minCol, Math.floor((rect.x - rect.marginX) / spacing))
-    maxCol = Math.max(maxCol, Math.ceil((rect.x + rect.width + rect.marginX) / spacing))
-    minRow = Math.min(minRow, Math.floor((rect.y - rect.marginY) / spacing))
-    maxRow = Math.max(maxRow, Math.ceil((rect.y + rect.height + rect.marginY) / spacing))
-  }
-
-  const padding = Math.max(4, Math.ceil(Math.sqrt(cards.length + 1)))
-
-  for (let row = minRow; row <= maxRow + padding; row += 1) {
-    const y = row * spacing
-    const snappedY = snapValueToGrid(y)
-
-    for (let col = minCol; col <= maxCol + padding; col += 1) {
-      const x = col * spacing
-      const snappedX = snapValueToGrid(x)
-
-      if (canvasSize) {
-        if (snappedX + candidateSize.width > canvasSize.width) {
-          continue
-        }
-        if (snappedY + candidateSize.height > canvasSize.height) {
-          continue
-        }
-      }
-
-      if (fitsAt({ x: snappedX, y: snappedY }, candidateSize, candidateSpacing, measuredCards)) {
-        return { position: { x: snappedX, y: snappedY }, overflowed: false }
-      }
-    }
-  }
-
-  const fallbackCol = Math.max(
-    0,
-    Math.ceil((maxCol + padding + 1) / columnSpan) * columnSpan
-  )
-  const fallbackRow = Math.max(
-    0,
-    Math.ceil((maxRow + padding + 1) / rowSpan) * rowSpan
-  )
-
-  const fallbackPosition = {
-    x: fallbackCol * spacing,
-    y: fallbackRow * spacing
-  }
-
-  return { position: fallbackPosition, overflowed: true }
+function resolveOrigin(grid?: GridConfig) {
+  if (!grid) return { x: 0, y: 0 }
+  if (grid.origin) return { ...grid.origin }
+  return { x: grid.left ?? 0, y: grid.top ?? 0 }
 }
 
-export function findNextGridPositionWithOverflow<T extends Positionable>(
-  cards: T[]
-): { position: { x: number; y: number }; overflowed: boolean } {
-  return resolvePlacement({ cards, size: { width: DEFAULT_CARD_WIDTH, height: DEFAULT_CARD_HEIGHT } })
+function resolveGridSize(grid?: GridConfig) {
+  return grid?.size ?? GRID_SPACING
 }
 
-export function findNextGridPosition<T extends Positionable>(cards: T[]): { x: number; y: number } {
-  return findNextGridPositionWithOverflow(cards).position
+function resolveCanvasWidth(
+  canvas: CanvasSize | undefined,
+  originX: number,
+  cardWidth: number,
+  xGap: number,
+  rects: PlacementRect[]
+) {
+  if (canvas?.width && Number.isFinite(canvas.width) && canvas.width > 0) {
+    return canvas.width
+  }
+
+  const defaultColumns = 4
+  const defaultWidth = originX + defaultColumns * cardWidth + (defaultColumns - 1) * xGap
+  const farthestRight = rects.reduce((max, rect) => Math.max(max, rect.x + rect.w), originX)
+  return Math.max(defaultWidth, farthestRight + cardWidth + xGap)
 }
 
-export function getNextCardPosition<T extends Positionable>(
-  size: { width?: number; height?: number },
-  cards: T[],
-  canvasSize?: { width: number; height: number },
-  grid?: { spacing?: number; origin?: { x: number; y: number } }
-): { x: number; y: number } {
-  const result = resolvePlacement({
-    cards,
-    size,
-    canvasSize,
-    gridSpacing: grid?.spacing,
-    origin: grid?.origin
+function snapCandidate(candidate: Candidate, gridSize: number): Candidate {
+  return {
+    ...candidate,
+    x: Math.round(candidate.x / gridSize) * gridSize,
+    y: Math.round(candidate.y / gridSize) * gridSize
+  }
+}
+
+function logPlacementDebug(
+  requested: { w: number; h: number },
+  chosen: { x: number; y: number },
+  context: {
+    rowY: number
+    rowMaxHeight: number
+    xGap: number
+    yGap: number
+  }
+) {
+  if (placementLogCount >= DEBUG_LIMIT) return
+  placementLogCount += 1
+  console.debug('[canvas] placement', {
+    requested,
+    chosen,
+    rowY: context.rowY,
+    rowMaxHeight: context.rowMaxHeight,
+    xGap: context.xGap,
+    yGap: context.yGap,
+    snapped: chosen
   })
+}
 
-  return result.position
+export function getNextCardPosition(
+  size: { w?: number; h?: number },
+  existingRects: PlacementRect[],
+  canvas?: CanvasSize,
+  grid?: GridConfig
+): { x: number; y: number } {
+  const cardWidth = normalizeDimension(size.w, DEFAULT_CARD_WIDTH)
+  const cardHeight = normalizeDimension(size.h, DEFAULT_CARD_HEIGHT)
+  const { xGap, yGap } = computeAdaptiveGaps(cardWidth, cardHeight)
+
+  const gridSize = resolveGridSize(grid)
+  const origin = resolveOrigin(grid)
+  const canvasWidth = resolveCanvasWidth(canvas, origin.x, cardWidth, xGap, existingRects)
+  const multiColumnThreshold = DEFAULT_CARD_WIDTH * 1.5
+  const baseAdvance = cardWidth + xGap
+  const multiColumnAdvance = Math.ceil(cardWidth / DEFAULT_CARD_WIDTH) * (DEFAULT_CARD_WIDTH + xGap)
+  const columnAdvance = cardWidth > multiColumnThreshold ? multiColumnAdvance : baseAdvance
+
+  let rowY = origin.y
+  let rowMaxHeight = cardHeight
+  let x = origin.x
+
+  const maxAttempts = 10000
+  let attempts = 0
+
+  while (attempts < maxAttempts) {
+    attempts += 1
+    const candidate: Candidate = { x, y: rowY, w: cardWidth, h: cardHeight }
+    const snappedCandidate = snapCandidate(candidate, gridSize)
+    const collision = findCollision(snappedCandidate, existingRects, PLACEMENT_MARGIN)
+
+    if (!collision) {
+      logPlacementDebug(
+        { w: cardWidth, h: cardHeight },
+        { x: snappedCandidate.x, y: snappedCandidate.y },
+        { rowY, rowMaxHeight, xGap, yGap }
+      )
+      return { x: snappedCandidate.x, y: snappedCandidate.y }
+    }
+
+    rowMaxHeight = Math.max(rowMaxHeight, collision.h)
+    const nextX = Math.max(x + columnAdvance, collision.x + collision.w + xGap)
+    x = nextX
+
+    if (x + cardWidth > canvasWidth) {
+      x = origin.x
+      rowY += rowMaxHeight + yGap
+      rowMaxHeight = cardHeight
+    }
+  }
+
+  const fallback = snapCandidate({ x: origin.x, y: rowY, w: cardWidth, h: cardHeight }, gridSize)
+  logPlacementDebug(
+    { w: cardWidth, h: cardHeight },
+    { x: fallback.x, y: fallback.y },
+    { rowY, rowMaxHeight, xGap, yGap }
+  )
+  return { x: fallback.x, y: fallback.y }
 }

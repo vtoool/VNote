@@ -1,7 +1,12 @@
 import localforage from 'localforage'
 import { createId } from './id'
 import { builtInTemplates } from './templates'
-import { findNextGridPosition } from './canvasLayout'
+import {
+  DEFAULT_CARD_HEIGHT,
+  DEFAULT_CARD_WIDTH,
+  getNextCardPosition,
+  toPlacementRects
+} from './canvasLayout'
 
 export type CardType = 'sticky' | 'checklist' | 'question' | 'media' | 'text'
 
@@ -330,7 +335,10 @@ export function createProjectFromTemplate(template: Template): Project {
     const positionedCards: Card[] = []
     template.defaultCards.forEach((seed) => {
       const card = createCardFromSeed(seed)
-      const position = findNextGridPosition(positionedCards)
+      const position = getNextCardPosition(
+        { w: DEFAULT_CARD_WIDTH, h: DEFAULT_CARD_HEIGHT },
+        toPlacementRects(positionedCards)
+      )
       positionedCards.push({ ...card, ...position })
     })
     initialCanvas.cards = positionedCards

@@ -15,7 +15,13 @@ import {
   ScriptQuestion,
   QuestionVariant
 } from '../lib/storage'
-import { findNextGridPosition } from '../lib/canvasLayout'
+import {
+  DEFAULT_CARD_HEIGHT,
+  DEFAULT_CARD_WIDTH,
+  getNextCardPosition,
+  snapPointToGrid,
+  toPlacementRects
+} from '../lib/canvasLayout'
 import { createId } from '../lib/id'
 import CallModePanel from '../components/CallModePanel'
 import { SummarizeButton } from '../components/SummarizeButton'
@@ -102,7 +108,10 @@ export default function CanvasRoute() {
 
   const addCard = (type: Card['type']) => {
     const now = new Date().toISOString()
-    const position = findNextGridPosition(workingCanvas.cards)
+    const position = getNextCardPosition(
+      { w: DEFAULT_CARD_WIDTH, h: DEFAULT_CARD_HEIGHT },
+      toPlacementRects(workingCanvas.cards)
+    )
     const base = {
       id: createId('card'),
       title: 'New card',
@@ -148,14 +157,20 @@ export default function CanvasRoute() {
   }
 
   const handleCaptureAnswer = (question: ScriptQuestion, variant: QuestionVariant) => {
-    const position = findNextGridPosition(workingCanvas.cards)
+    const position = getNextCardPosition(
+      { w: DEFAULT_CARD_WIDTH, h: DEFAULT_CARD_HEIGHT },
+      toPlacementRects(workingCanvas.cards)
+    )
     const card: Card = createQuestionCard({ question, variant, position })
     updateCanvas({ ...workingCanvas, cards: [card, ...workingCanvas.cards] })
   }
 
   const handleSummaryResult = (summary: string) => {
     const now = new Date().toISOString()
-    const position = findNextGridPosition(workingCanvas.cards)
+    const position = getNextCardPosition(
+      { w: DEFAULT_CARD_WIDTH, h: DEFAULT_CARD_HEIGHT },
+      toPlacementRects(workingCanvas.cards)
+    )
     const summaryCard: Card = {
       id: createId('card'),
       type: 'text',

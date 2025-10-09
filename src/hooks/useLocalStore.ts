@@ -20,7 +20,13 @@ import {
 } from '../lib/storage'
 import { builtInTemplates } from '../lib/templates'
 import { createId } from '../lib/id'
-import { findNextGridPosition, snapPointToGrid } from '../lib/canvasLayout'
+import {
+  DEFAULT_CARD_HEIGHT,
+  DEFAULT_CARD_WIDTH,
+  getNextCardPosition,
+  snapPointToGrid,
+  toPlacementRects
+} from '../lib/canvasLayout'
 
 interface StoreActions {
   hydrate: () => Promise<void>
@@ -143,7 +149,10 @@ const useZustandStore = create<LocalStore>()((set, get) => ({
                       {
                         ...card,
                         ...(() => {
-                          const fallbackPosition = findNextGridPosition(canvas.cards)
+                          const fallbackPosition = getNextCardPosition(
+                            { w: DEFAULT_CARD_WIDTH, h: DEFAULT_CARD_HEIGHT },
+                            toPlacementRects(canvas.cards)
+                          )
                           const hasPosition = Number.isFinite(card.x) && Number.isFinite(card.y)
                           if (!hasPosition) {
                             return fallbackPosition
