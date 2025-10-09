@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
+import MicWidget from "@/components/MicWidget"
 import { chat, ChatMessage } from "@/lib/ai"
 import { getCanvasPlainText } from "@/lib/canvasText"
 
@@ -36,10 +37,11 @@ export default function CanvasChatSidebar({ canvas, canvasId, onClose }: Props) 
     scrollRef.current?.scrollTo({ top: 1e9, behavior: "smooth" })
   }, [messages, loading])
 
-  async function send() {
-    if (!input.trim() || loading) return
+  async function sendMessage(content?: string) {
+    const text = (content ?? input).trim()
+    if (!text || loading) return
     setError(null)
-    const userMsg: ChatMessage = { role: "user", content: input.trim() }
+    const userMsg: ChatMessage = { role: "user", content: text }
     const nextMessages = [...messages, userMsg]
     setMessages(nextMessages)
     setInput("")
@@ -67,8 +69,19 @@ export default function CanvasChatSidebar({ canvas, canvasId, onClose }: Props) 
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
-      void send()
+      void sendMessage()
     }
+  }
+
+  const handleMicDone = (spoken: string) => {
+    if (loading) return
+    const trimmed = spoken.trim()
+    if (!trimmed) return
+    setInput((prev) => {
+      const nextInput = prev ? `${prev} ${trimmed}` : trimmed
+      void sendMessage(nextInput)
+      return nextInput
+    })
   }
 
   return (
@@ -110,6 +123,9 @@ export default function CanvasChatSidebar({ canvas, canvasId, onClose }: Props) 
       </div>
 
       <div className="border-t border-slate-200/70 bg-white/50 px-4 py-3 backdrop-blur-sm dark:border-slate-700/60 dark:bg-slate-900/30">
+        <div className="mb-3">
+          <MicWidget onDone={handleMicDone} />
+        </div>
         <textarea
           className="h-24 w-full resize-none rounded-2xl border border-slate-200/80 bg-white/80 p-3 text-slate-700 shadow-inner outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-200/60 dark:border-slate-700/60 dark:bg-slate-800/60 dark:text-slate-100 dark:focus:border-indigo-400/40 dark:focus:ring-indigo-500/30"
           placeholder="Ask about anything on this canvas… (Shift+Enter for newline)"
@@ -121,7 +137,7 @@ export default function CanvasChatSidebar({ canvas, canvasId, onClose }: Props) 
           <div>Context chars: {contextText.length}</div>
           <button
             className="rounded-full border border-indigo-200 bg-indigo-500/90 px-4 py-1 font-semibold text-white shadow transition hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-500 dark:border-indigo-400/40"
-            onClick={send}
+            onClick={() => void sendMessage()}
             disabled={loading || !input.trim()}
           >
             Send
