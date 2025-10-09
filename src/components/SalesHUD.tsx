@@ -34,9 +34,14 @@ export function SalesHUD({
   onHandleObjection,
   error
 }: SalesHUDProps) {
-  const displayLine = streamingNextLine?.trim().length
+  const trimmedError = error?.trim() ?? ''
+  const resolvedLine = streamingNextLine?.trim().length
     ? streamingNextLine.trim()
-    : proposal?.nextLine || 'Log what you just said to receive the next best line.'
+    : proposal?.nextLine?.trim() ?? ''
+  const fallbackMessage = 'Log what you just said to receive the next best line.'
+  const formattedError = trimmedError.length > 220 ? `${trimmedError.slice(0, 219)}…` : trimmedError
+  const displayLine = trimmedError ? `Assistant unavailable: ${formattedError}` : resolvedLine || fallbackMessage
+  const hasResolvedLine = Boolean(resolvedLine)
 
   const alternatives = useMemo(() => {
     const unique = new Set<string>()
@@ -54,8 +59,8 @@ export function SalesHUD({
   }, [proposal])
 
   const handleCopy = () => {
-    if (!displayLine.trim()) return
-    onCopy?.(displayLine)
+    if (!hasResolvedLine) return
+    onCopy?.(resolvedLine)
   }
 
   return (
@@ -69,7 +74,15 @@ export function SalesHUD({
                 Groq is drafting…
               </span>
             ) : (
-              <span>{displayLine}</span>
+              <span
+                className={
+                  trimmedError
+                    ? 'text-base font-medium text-rose-600 dark:text-rose-400'
+                    : undefined
+                }
+              >
+                {displayLine}
+              </span>
             )}
           </div>
           {proposal?.expectedCustomerReplyType && (
@@ -83,7 +96,7 @@ export function SalesHUD({
             type="button"
             onClick={handleCopy}
             className="rounded-full border border-indigo-200 bg-indigo-500/90 px-3 py-1.5 text-xs font-semibold text-white shadow transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-indigo-400/60"
-            disabled={!displayLine.trim()}
+            disabled={!hasResolvedLine}
           >
             Copy line
           </button>
@@ -145,8 +158,10 @@ export function SalesHUD({
         >
           Handle objection
         </button>
-        {error && (
-          <span className="text-xs font-medium text-rose-600 dark:text-rose-400">{error}</span>
+        {trimmedError && (
+          <span className="text-xs font-medium text-rose-600 dark:text-rose-400">
+            {formattedError}
+          </span>
         )}
       </footer>
     </section>
