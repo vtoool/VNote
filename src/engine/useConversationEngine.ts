@@ -180,46 +180,161 @@ const computeContextSignals = (history: ConversationTurn[]): ContextSignals => {
   }
 }
 
-const mapProposal = (payload: any, raw: string): Proposal => {
-  const objectionPayload: ProposalObjection = {
-    detected: Boolean(payload?.objection?.detected),
-    category:
-      typeof payload?.objection?.category === 'string' && payload.objection.category.length
-        ? payload.objection.category
-        : undefined,
-    suggestions: Array.isArray(payload?.objection?.suggestions)
-      ? payload.objection.suggestions.filter((item: unknown) => typeof item === 'string')
-      : []
+const isRecord = (value: unknown): value is Record<string, any> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+
+const coerceStringArray = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((item) => typeof item === 'string').map(String) : []
+
+const COMPLETED_STATES = new Set(['done', 'complete', 'completed', 'achieved', 'finished', 'yes', 'true'])
+
+const resolveDoneState = (value: unknown): boolean => {
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'number') return Number.isFinite(value) ? value > 0 : false
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase()
+    if (COMPLETED_STATES.has(normalized)) return true
+    if (normalized === 'not started' || normalized === 'todo' || normalized === 'to do') return false
+    if (normalized === 'in progress' || normalized === 'pending') return false
+    return false
   }
+  if (isRecord(value)) {
+    if ('done' in value) return resolveDoneState(value.done)
+    if ('status' in value) return resolveDoneState(value.status)
+    if ('state' in value) return resolveDoneState(value.state)
+  }
+  return false
+}
 
-  const checklistItems: ChecklistItemState[] = Array.isArray(payload?.checklist)
-    ? payload.checklist
-        .filter((item: unknown) => item && typeof item === 'object' && 'name' in (item as Record<string, unknown>))
-        .map((item: any) => ({
-          name: String(item.name),
-          done: Boolean(item.done),
-          description: item.description ? String(item.description) : undefined
-        }))
-    : []
+const resolveDescription = (value: unknown): string | undefined => {
+  if (isRecord(value) && typeof value.description === 'string') {
+    return value.description
+  }
+  return undefined
+}
 
-  const expected =
-    payload?.expected_customer_reply_type === 'yes_no' ||
-    payload?.expected_customer_reply_type === 'narrative' ||
-    payload?.expected_customer_reply_type === 'selection'
-      ? payload.expected_customer_reply_type
+const coerceChecklistItems = (value: unknown): ChecklistItemState[] => {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item) => item && typeof item === 'object' && 'name' in (item as Record<string, unknown>))
+      .map((item: any) => ({
+        name: String(item.name),
+        done: resolveDoneState(item.done),
+        description:
+          typeof item.description === 'string' ? item.description : resolveDescription(item.description)
+      }))
+  }
+  if (isRecord(value)) {
+    return Object.entries(value).map(([name, status]) => ({
+      name: String(name),
+      done: resolveDoneState(status),
+      description: resolveDescription(status)
+    }))
+  }
+  return []
+}
+
+const mergeChecklistItems = (items: ChecklistItemState[]): ChecklistItemState[] => {
+  const map = new Map<string, ChecklistItemState>()
+  for (const item of items) {
+    const key = item.name.toLowerCase()
+    const existing = map.get(key)
+    if (existing) {
+      map.set(key, {
+        name: item.name || existing.name,
+        done: existing.done || item.done,
+        description: item.description ?? existing.description
+      })
+    } else {
+      map.set(key, item)
+    }
+  }
+  return Array.from(map.values())
+}
+
+const extractCompletedFromRecord = (value: unknown): string[] => {
+  if (!isRecord(value)) return []
+  return Object.entries(value)
+    .filter(([, status]) => resolveDoneState(status))
+    .map(([name]) => String(name))
+}
+
+const mapProposal = (payload: any, raw: string): Proposal => {
+  const guidance = isRecord(payload?.guidance) ? payload.guidance : undefined
+  const actions = isRecord(payload?.actions) ? payload.actions : undefined
+
+  const nextLineSource =
+    (typeof guidance?.next_line === 'string' && guidance.next_line) ||
+    (typeof guidance?.nextLine === 'string' && guidance.nextLine) ||
+    (typeof payload?.next_line === 'string' && payload.next_line) ||
+    (typeof payload?.nextLine === 'string' && payload.nextLine) ||
+    raw
+
+  const rationaleSource =
+    (typeof guidance?.rationale === 'string' && guidance.rationale) ||
+    (typeof payload?.rationale === 'string' && payload.rationale) ||
+    ''
+
+  const followupSource =
+    guidance?.suggested_followups ??
+    guidance?.followups ??
+    payload?.followups ??
+    actions?.suggested_followups ??
+    actions?.followups
+
+  const expectedRaw =
+    guidance?.expected_customer_reply_type ??
+    guidance?.expectedCustomerReplyType ??
+    payload?.expected_customer_reply_type ??
+    payload?.expectedCustomerReplyType
+
+  const expected: Proposal['expectedCustomerReplyType'] =
+    expectedRaw === 'yes_no' || expectedRaw === 'narrative' || expectedRaw === 'selection'
+      ? expectedRaw
       : 'open_question'
 
+  const objectionSource =
+    (isRecord(guidance?.objection) && guidance.objection) ||
+    (isRecord(payload?.objection) && payload.objection) ||
+    (isRecord(actions?.objection) && actions.objection) ||
+    undefined
+
+  const objectionPayload: ProposalObjection = {
+    detected: Boolean(objectionSource?.detected),
+    category:
+      typeof objectionSource?.category === 'string' && objectionSource.category.length
+        ? objectionSource.category
+        : undefined,
+    suggestions: coerceStringArray(objectionSource?.suggestions)
+  }
+
+  const checklistItems = mergeChecklistItems(
+    [payload?.checklist, guidance?.checklist, actions?.update_checklist]
+      .flatMap((source) => coerceChecklistItems(source))
+  )
+
+  const goalsProgress = Array.from(
+    new Set(
+      [
+        ...coerceStringArray(payload?.goals_progress),
+        ...coerceStringArray(guidance?.goals_progress),
+        ...coerceStringArray(guidance?.goal_progress),
+        ...extractCompletedFromRecord(guidance?.goals_progress),
+        ...extractCompletedFromRecord(guidance?.goal_progress),
+        ...extractCompletedFromRecord(actions?.update_goal_progress)
+      ]
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0)
+    )
+  )
+
   return {
-    nextLine: typeof payload?.next_line === 'string' ? payload.next_line.trim() : raw.trim(),
-    rationale: typeof payload?.rationale === 'string' ? payload.rationale.trim() : '',
-    goalsProgress: Array.isArray(payload?.goals_progress)
-      ? payload.goals_progress.filter((item: unknown) => typeof item === 'string')
-      : [],
+    nextLine: nextLineSource.trim(),
+    rationale: rationaleSource.trim(),
+    goalsProgress,
     expectedCustomerReplyType: expected,
     objection: objectionPayload,
-    followups: Array.isArray(payload?.followups)
-      ? payload.followups.filter((item: unknown) => typeof item === 'string')
-      : [],
+    followups: coerceStringArray(followupSource),
     checklist: checklistItems,
     raw
   }
