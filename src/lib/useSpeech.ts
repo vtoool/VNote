@@ -3,12 +3,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 export type UseSpeech = {
   supported: boolean
   listening: boolean
-  interim: string
   finalText: string
-  lang: string
   start: () => void
   stop: () => void
-  setLang: (l: string) => void
   clear: () => void
 }
 
@@ -17,40 +14,34 @@ const getSpeechRecognition = () => {
   return (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition || null
 }
 
-export function useSpeech(initialLang = "en-US"): UseSpeech {
+export function useSpeech(): UseSpeech {
   const SpeechRecognition = useMemo(() => getSpeechRecognition(), [])
   const supported = !!SpeechRecognition
 
   const recognitionRef = useRef<any>(null)
   const [listening, setListening] = useState(false)
-  const [interim, setInterim] = useState("")
   const [finalText, setFinalText] = useState("")
-  const [lang, _setLang] = useState(initialLang)
 
   useEffect(() => {
     if (!SpeechRecognition) return
     const rec = new SpeechRecognition()
-    rec.continuous = true
-    rec.interimResults = true
-    rec.lang = lang
+    rec.continuous = false
+    rec.interimResults = false
+    rec.lang = "en-US"
 
     rec.onresult = (event: any) => {
-      let interimText = ""
       let finalChunks = ""
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const res = event.results[i]
         if (res.isFinal) finalChunks += res[0]?.transcript ?? ""
-        else interimText += res[0]?.transcript ?? ""
       }
       if (finalChunks) {
         setFinalText((prev) => `${prev}${finalChunks}`)
       }
-      setInterim(interimText)
     }
 
     rec.onend = () => {
       setListening(false)
-      setInterim("")
     }
     rec.onerror = () => {
       setListening(false)
@@ -65,31 +56,25 @@ export function useSpeech(initialLang = "en-US"): UseSpeech {
       rec.stop?.()
       recognitionRef.current = null
     }
-  }, [SpeechRecognition, lang])
+  }, [SpeechRecognition])
 
   const start = useCallback(() => {
     if (!recognitionRef.current) return
     try {
-      recognitionRef.current.lang = lang
       recognitionRef.current.start()
       setListening(true)
     } catch (error) {
       console.error("Failed to start speech recognition", error)
     }
-  }, [lang])
+  }, [])
 
   const stop = useCallback(() => {
     recognitionRef.current?.stop()
   }, [])
 
-  const setLang = useCallback((l: string) => {
-    _setLang(l)
-  }, [])
-
   const clear = useCallback(() => {
-    setInterim("")
     setFinalText("")
   }, [])
 
-  return { supported, listening, interim, finalText, lang, start, stop, setLang, clear }
+  return { supported, listening, finalText, start, stop, clear }
 }
