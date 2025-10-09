@@ -7,7 +7,7 @@ const BASE_HORIZONTAL_GAP = 16
 const BASE_VERTICAL_GAP = 16
 const HORIZONTAL_GAP_FACTOR = 0.1
 const VERTICAL_GAP_FACTOR = 0.1
-const MIN_HORIZONTAL_GAP = 16
+const MIN_HORIZONTAL_GAP = 12
 const MAX_HORIZONTAL_GAP = 48
 const MIN_VERTICAL_GAP = 12
 const MAX_VERTICAL_GAP = 40
@@ -91,29 +91,18 @@ function computeAdaptiveGaps(w: number, h: number) {
   return { xGap, yGap }
 }
 
-function expand(rect: Candidate, margin: number) {
-  return {
-    left: rect.x - margin,
-    right: rect.x + rect.w + margin,
-    top: rect.y - margin,
-    bottom: rect.y + rect.h + margin
-  }
-}
-
-function overlaps(a: Candidate, b: Candidate, margin: number) {
-  const expandedA = expand(a, margin)
-  const expandedB = expand(b, margin)
+function intersects(a: Candidate, b: Candidate, margin: number) {
   return !(
-    expandedA.right <= expandedB.left ||
-    expandedB.right <= expandedA.left ||
-    expandedA.bottom <= expandedB.top ||
-    expandedB.bottom <= expandedA.top
+    a.x + a.w + margin <= b.x ||
+    b.x + b.w + margin <= a.x ||
+    a.y + a.h + margin <= b.y ||
+    b.y + b.h + margin <= a.y
   )
 }
 
 function findCollision(candidate: Candidate, rects: PlacementRect[], margin: number): PlacementRect | null {
   for (const rect of rects) {
-    if (overlaps(candidate, { x: rect.x, y: rect.y, w: rect.w, h: rect.h }, margin)) {
+    if (intersects(candidate, { x: rect.x, y: rect.y, w: rect.w, h: rect.h }, margin)) {
       return rect
     }
   }
@@ -196,6 +185,10 @@ export function getNextCardPosition(
   const multiColumnAdvance = Math.ceil(cardWidth / DEFAULT_CARD_WIDTH) * (DEFAULT_CARD_WIDTH + xGap)
   const columnAdvance = cardWidth > multiColumnThreshold ? multiColumnAdvance : baseAdvance
 
+  if (existingRects.length === 0) {
+    placementLogCount = 0
+  }
+
   let rowY = origin.y
   let rowMaxHeight = cardHeight
   let x = origin.x
@@ -205,6 +198,14 @@ export function getNextCardPosition(
 
   while (attempts < maxAttempts) {
     attempts += 1
+
+    if (x + cardWidth > canvasWidth && x !== origin.x) {
+      x = origin.x
+      rowY += rowMaxHeight + yGap
+      rowMaxHeight = cardHeight
+      continue
+    }
+
     const candidate: Candidate = { x, y: rowY, w: cardWidth, h: cardHeight }
     const snappedCandidate = snapCandidate(candidate, gridSize)
     const collision = findCollision(snappedCandidate, existingRects, PLACEMENT_MARGIN)
@@ -218,15 +219,9 @@ export function getNextCardPosition(
       return { x: snappedCandidate.x, y: snappedCandidate.y }
     }
 
-    rowMaxHeight = Math.max(rowMaxHeight, collision.h)
+    rowMaxHeight = Math.max(rowMaxHeight, collision.h, cardHeight)
     const nextX = Math.max(x + columnAdvance, collision.x + collision.w + xGap)
     x = nextX
-
-    if (x + cardWidth > canvasWidth) {
-      x = origin.x
-      rowY += rowMaxHeight + yGap
-      rowMaxHeight = cardHeight
-    }
   }
 
   const fallback = snapCandidate({ x: origin.x, y: rowY, w: cardWidth, h: cardHeight }, gridSize)
