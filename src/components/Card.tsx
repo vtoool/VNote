@@ -27,8 +27,8 @@ export default function CardComponent({ card, onChange, onDelete }: CardProps) {
   const isMediaCard = card.type === 'media'
   const baseClasses = `${
     isMediaCard
-      ? 'flex w-full min-h-[280px] min-w-[16rem] max-w-[28rem] flex-col overflow-hidden'
-      : 'flex w-full min-h-[280px] min-w-[16rem] max-w-[28rem] flex-col overflow-hidden'
+      ? 'flex w-full min-h-[280px] min-w-[16rem] max-w-[28rem] flex-col overflow-hidden rounded-[28px]'
+      : 'flex w-full min-h-[280px] min-w-[16rem] max-w-[28rem] flex-col overflow-hidden rounded-[28px]'
   } border border-white/70 bg-white/90 p-4 text-sm shadow-soft dark:border-slate-800/70 dark:bg-slate-900/80`
 
   const snapHeightToGrid = useCallback((value: number) => {
