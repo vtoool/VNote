@@ -81,7 +81,7 @@ export default function Home() {
                   </div>
                   <div className="flex flex-wrap gap-2 sm:flex-nowrap">
                     <button
-                      onClick={() => navigate(`/project/${project.id}`)}
+                      onClick={() => navigate(`/workspace/project/${project.id}`)}
                       className="rounded-2xl bg-indigo-500/10 px-3 py-2 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-500/20 dark:text-indigo-200"
                     >
                       Open
@@ -89,7 +89,7 @@ export default function Home() {
                     <button
                       onClick={() => {
                         const duplicate = store.duplicateProject(project.id)
-                        if (duplicate) navigate(`/project/${duplicate.id}`)
+                        if (duplicate) navigate(`/workspace/project/${duplicate.id}`)
                       }}
                       className="rounded-2xl bg-white/60 px-3 py-2 text-xs text-slate-500 shadow-sm transition hover:bg-white/90 dark:bg-slate-800/60 dark:text-slate-300"
                     >
@@ -128,7 +128,7 @@ export default function Home() {
           const project = store.addProject(tpl)
           if (project) {
             setTemplateDialogOpen(false)
-            navigate(`/project/${project.id}`)
+            navigate(`/workspace/project/${project.id}`)
           }
         }}
       />

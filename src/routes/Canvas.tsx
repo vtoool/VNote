@@ -52,7 +52,7 @@ export default function CanvasRoute() {
     return (
       <div className="glass-panel mx-auto mt-12 max-w-lg space-y-4 p-8 text-center">
         <p className="text-lg font-semibold text-slate-600 dark:text-slate-200">Canvas not found.</p>
-        <Link to={`/project/${projectId}`} className="rounded-2xl bg-indigo-500/10 px-4 py-2 text-sm text-indigo-600 dark:text-indigo-200">
+        <Link to={`/workspace/project/${projectId}`} className="rounded-2xl bg-indigo-500/10 px-4 py-2 text-sm text-indigo-600 dark:text-indigo-200">
           Back to project
         </Link>
       </div>

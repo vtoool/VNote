@@ -1,10 +1,15 @@
+import { useContext } from 'react'
 import { Card } from '../lib/storage'
+import { StoreContext } from '../App'
+import { personalizeAgentText } from '../lib/personalization'
 
 interface ObjectionsLogProps {
   cards: Card[]
 }
 
 export default function ObjectionsLog({ cards }: ObjectionsLogProps) {
+  const store = useContext(StoreContext)!
+  const agentName = store.settings.agentName
   const objections = cards.filter((card) => card.tags.includes('objection'))
   if (objections.length === 0) return null
   return (
@@ -23,7 +28,7 @@ export default function ObjectionsLog({ cards }: ObjectionsLogProps) {
             <tr key={card.id} className="border-t border-white/30 text-sm dark:border-slate-800/60">
               <td className="py-2 font-semibold text-slate-700 dark:text-slate-100">{card.title}</td>
               <td className="py-2 text-slate-500 dark:text-slate-300">{'answer' in card ? card.answer : card.content}</td>
-              <td className="py-2 text-slate-500 dark:text-slate-300">{card.content}</td>
+              <td className="py-2 text-slate-500 dark:text-slate-300">{personalizeAgentText(card.content, agentName)}</td>
             </tr>
           ))}
         </tbody>

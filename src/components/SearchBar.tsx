@@ -21,7 +21,10 @@ export default function SearchBar({
   const store = useContext(StoreContext)!
   const navigate = useNavigate()
   const [term, setTerm] = useState('')
-  const results = useMemo(() => (term ? search(store.projects, term) : []), [store.projects, term])
+  const results = useMemo(
+    () => (term ? search(store.projects, term, store.settings.agentName) : []),
+    [store.projects, store.settings.agentName, term]
+  )
 
   return (
     <div className={`relative w-full ${containerClassName ?? 'max-w-md'}`}>
@@ -41,9 +44,9 @@ export default function SearchBar({
                 <button
                   onClick={() => {
                     if (result.canvasId) {
-                      navigate(`/project/${result.projectId}/canvas/${result.canvasId}`)
+                      navigate(`/workspace/project/${result.projectId}/canvas/${result.canvasId}`)
                     } else {
-                      navigate(`/project/${result.projectId}`)
+                      navigate(`/workspace/project/${result.projectId}`)
                     }
                     setTerm('')
                     onNavigate?.()

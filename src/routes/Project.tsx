@@ -6,6 +6,7 @@ import { strings } from '../lib/i18n'
 import { createEmptyCanvas } from '../lib/storage'
 import { findNextGridPosition } from '../lib/canvasLayout'
 import { createQuestionCard } from '../lib/questions'
+import { personalizeAgentText } from '../lib/personalization'
 
 export default function ProjectRoute() {
   const { projectId } = useParams()
@@ -24,8 +25,8 @@ export default function ProjectRoute() {
     return (
       <div className="glass-panel mx-auto mt-12 max-w-lg space-y-4 p-8 text-center">
         <p className="text-lg font-semibold text-slate-600 dark:text-slate-200">Project not found.</p>
-        <Link to="/" className="rounded-2xl bg-indigo-500/10 px-4 py-2 text-sm text-indigo-600 dark:text-indigo-200">
-          Back home
+        <Link to="/workspace" className="rounded-2xl bg-indigo-500/10 px-4 py-2 text-sm text-indigo-600 dark:text-indigo-200">
+          Back to workspace
         </Link>
       </div>
     )
@@ -51,7 +52,11 @@ export default function ProjectRoute() {
           <div className="flex flex-wrap items-center gap-2">
             {project.canvases[0] && (
               <button
-                onClick={() => navigate(`/project/${project.id}/canvas/${project.canvases[0].id}`, { state: { callMode: true } })}
+                onClick={() =>
+                  navigate(`/workspace/project/${project.id}/canvas/${project.canvases[0].id}`, {
+                    state: { callMode: true }
+                  })
+                }
                 className="rounded-2xl bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-600 transition hover:bg-emerald-500/20 dark:text-emerald-200"
               >
                 Start call mode
@@ -76,7 +81,7 @@ export default function ProjectRoute() {
             {canvases.map((canvas) => (
               <button
                 key={canvas.id}
-                onClick={() => navigate(`/project/${project.id}/canvas/${canvas.id}`)}
+                onClick={() => navigate(`/workspace/project/${project.id}/canvas/${canvas.id}`)}
                 className="flex flex-col items-start gap-2 rounded-3xl border border-transparent bg-indigo-500/5 p-4 text-left transition hover:-translate-y-1 hover:border-indigo-400 hover:shadow-glow"
               >
                 <span className="text-lg font-semibold text-slate-800 dark:text-slate-100">{canvas.name}</span>
@@ -91,7 +96,7 @@ export default function ProjectRoute() {
                   canvases: [canvas, ...proj.canvases],
                   updatedAt: new Date().toISOString()
                 }))
-                navigate(`/project/${project.id}/canvas/${canvas.id}`)
+                navigate(`/workspace/project/${project.id}/canvas/${canvas.id}`)
               }}
               className="flex items-center justify-center rounded-3xl border border-dashed border-indigo-400/50 bg-indigo-100/30 p-4 text-sm font-semibold text-indigo-500 hover:bg-indigo-200/40"
             >
@@ -196,7 +201,7 @@ export default function ProjectRoute() {
                             }}
                             className="block w-full rounded-2xl bg-indigo-500/10 px-3 py-2 text-left text-xs text-indigo-600 transition hover:bg-indigo-500/20 dark:text-indigo-200"
                           >
-                            ✨ {variant.text}
+                            ✨ {personalizeAgentText(variant.text, store.settings.agentName)}
                           </button>
                         ))}
                       </div>

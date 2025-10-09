@@ -3,6 +3,7 @@ import { create } from 'zustand'
 import {
   Project,
   StoreState,
+  UserSettings,
   loadStore,
   saveStore,
   createProjectFromTemplate,
@@ -35,6 +36,7 @@ interface StoreActions {
   updateTemplate: (templateId: string, updates: Partial<Omit<Template, 'id'>>) => void
   duplicateTemplate: (templateId: string) => Template | undefined
   deleteTemplate: (templateId: string) => void
+  updateSettings: (updates: Partial<UserSettings>) => void
 }
 
 interface LocalStore extends StoreState, StoreActions {
@@ -74,6 +76,7 @@ function cloneScript(script: Script): Script {
 const useZustandStore = create<LocalStore>()((set, get) => ({
     projects: [],
     templates: builtInTemplates,
+    settings: { agentName: 'Alex' },
     ready: false,
     dirty: false,
     lastSavedAt: undefined,
@@ -217,6 +220,12 @@ const useZustandStore = create<LocalStore>()((set, get) => ({
         templates: get().templates.filter((template) => template.id !== templateId || template.builtIn),
         dirty: true
       })
+    },
+    updateSettings: (updates) => {
+      set({
+        settings: { ...get().settings, ...updates },
+        dirty: true
+      })
     }
   })
 )
@@ -241,11 +250,16 @@ export function useLocalStore() {
         ...project,
         versionHistory: project.versionHistory.slice(0, 10)
       }))
-      await saveStore({ projects: snapshotProjects, templates: store.templates, lastSavedAt: new Date().toISOString() })
+      await saveStore({
+        projects: snapshotProjects,
+        templates: store.templates,
+        settings: store.settings,
+        lastSavedAt: new Date().toISOString()
+      })
       setSavingState('saved')
       useZustandStore.setState({ dirty: false, lastSavedAt: new Date().toISOString() })
     }, 2000)
-  }, [store.projects, store.templates, store.ready, store.dirty])
+  }, [store.projects, store.templates, store.settings, store.ready, store.dirty])
 
   const saveSnapshot = useCallback(
     (projectId: string, label: string) => {
