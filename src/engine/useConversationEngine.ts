@@ -113,7 +113,9 @@ const decodeJsonString = (value: string): string => {
 const estimateTokens = (text: string): number => Math.ceil(text.length / 4)
 
 const extractNextLinePreview = (buffer: string): string | null => {
-  const match = buffer.match(/"next_line"\s*:\s*"((?:[^"\\]|\\.)*)/)
+  const match = buffer.match(
+    /"(?:next_line|nextLine|nextbest_line|nextBestLine|next_best_line|best_next_line|bestNextLine|best_nextBestLine)"\s*:\s*"((?:[^"\\]|\\.)*)/
+  )
   if (!match) return null
   return decodeJsonString(match[1])
 }
