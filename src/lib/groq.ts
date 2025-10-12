@@ -13,6 +13,9 @@ export interface StreamChatOptions {
   signal?: AbortSignal
   onToken?: (token: string) => void
   onChunk?: (chunk: unknown) => void
+  stop?: string[]
+  responseFormat?: Record<string, unknown>
+  stream?: boolean
 }
 
 const DEFAULT_MODEL = 'llama-3.1-8b-instant'
@@ -58,7 +61,10 @@ export async function streamChat(
     maxTokens,
     signal,
     onToken,
-    onChunk
+    onChunk,
+    stop,
+    responseFormat,
+    stream = true
   }: StreamChatOptions = {}
 ): Promise<string> {
   const base = import.meta.env.VITE_AI_URL
@@ -69,7 +75,7 @@ export async function streamChat(
   const body: Record<string, unknown> = {
     model,
     messages,
-    stream: true,
+    stream,
     temperature
   }
 
@@ -77,7 +83,13 @@ export async function streamChat(
     body.max_tokens = maxTokens
   }
 
-  if (json) {
+  if (Array.isArray(stop) && stop.length > 0) {
+    body.stop = stop
+  }
+
+  if (responseFormat) {
+    body.response_format = responseFormat
+  } else if (json) {
     body.response_format = GUIDANCE_RESPONSE_FORMAT ?? JSON_OBJECT_RESPONSE_FORMAT
   }
 
@@ -94,19 +106,35 @@ export async function streamChat(
   }
 
   const contentType = response.headers.get('content-type')?.toLowerCase() ?? ''
-  const isEventStream = contentType.includes('text/event-stream')
+  const isEventStream = stream && contentType.includes('text/event-stream')
 
   if (!isEventStream) {
     const text = await response.text()
     const trimmed = text.trim()
-    if (trimmed && json) {
+    if (!trimmed) {
+      return ''
+    }
+
+    if (contentType.includes('application/json')) {
       try {
         const parsed = JSON.parse(trimmed)
         onChunk?.(parsed)
+        const messageContent = parsed?.choices?.[0]?.message?.content
+        if (typeof messageContent === 'string') {
+          return messageContent.trim()
+        }
+        if (json) {
+          return trimmed
+        }
       } catch (error) {
-        console.warn('Failed to parse Groq response as JSON', error)
+        console.warn('Failed to parse Groq JSON response', error)
+        if (json) {
+          return trimmed
+        }
       }
-    } else if (trimmed && onToken) {
+    }
+
+    if (trimmed && onToken) {
       onToken(trimmed)
     }
     return trimmed

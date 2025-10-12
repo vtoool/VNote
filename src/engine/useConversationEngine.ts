@@ -2,9 +2,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { SentimentIntensityAnalyzer } from 'vader-sentiment'
 import { saveAs } from 'file-saver'
 import { createId } from '../lib/id'
-import { streamChat, type ChatMessage } from '../lib/groq'
-import { parseAIGuidance } from '../lib/parseAIGuidance'
-import { buildSystemPrompt, renderUserContext } from './prompt'
+import { streamChat } from '../lib/groq'
+import {
+  buildCoachStateContext,
+  buildCoachUserPrompt
+} from './prompt'
+import {
+  SALES_COACH_SYSTEM,
+  COACH_RESPONSE_FORMAT,
+  COACH_STOP_SEQUENCES,
+  processCoachResponse,
+  CoachSuggestionError,
+  buildCoachMessages,
+  type ProcessedCoachSuggestion
+} from './coach'
 import { SALES_PLAN } from '../knowledge/plan'
 import { OBJECTION_LIBRARY } from '../knowledge/objections'
 import type {
@@ -16,19 +27,13 @@ import type {
   ObjectionPlaybookEntry,
   Persona,
   Proposal,
-  ProposalObjection,
   SalesPlan
 } from './types'
 import type { Script } from '../lib/storage'
 
 const STORAGE_NAMESPACE = 'vnote.sales.conversation'
 const MAX_HISTORY_ENTRIES = 150
-const MAX_PROMPT_CHARACTERS = 8000
-const MAX_PROMPT_TURNS = 40
-const MAX_TOTAL_TOKENS = 6000
-const MIN_COMPLETION_TOKENS = 256
-const MAX_COMPLETION_TOKENS = 1200
-const TOKEN_SAFETY_MARGIN = 400
+const COACH_COMPLETION_TOKENS = 220
 
 export const getConversationStorageKey = (projectId?: string): string =>
   projectId ? `${STORAGE_NAMESPACE}.${projectId}` : STORAGE_NAMESPACE
@@ -100,49 +105,12 @@ interface ExportPayload {
   history: ConversationTurn[]
 }
 
-const decodeJsonString = (value: string): string => {
-  try {
-    return JSON.parse(`"${value}"`)
-  } catch {
-    return value
-      .replace(/\\n/g, '\n')
-      .replace(/\\"/g, '"')
-      .replace(/\\\\/g, '\\')
-  }
-}
-
-const estimateTokens = (text: string): number => Math.ceil(text.length / 4)
-
-const extractNextLinePreview = (buffer: string): string | null => {
-  const match = buffer.match(
-    /"(?:next_line|nextLine|nextbest_line|nextBestLine|next_best_line|best_next_line|bestNextLine|best_nextBestLine)"\s*:\s*"((?:[^"\\]|\\.)*)/
-  )
-  if (!match) return null
-  return decodeJsonString(match[1])
-}
-
 const appendEntry = (history: ConversationTurn[], entry: ConversationTurn): ConversationTurn[] => {
   const next = [...history, entry]
   if (next.length > MAX_HISTORY_ENTRIES) {
     next.splice(0, next.length - MAX_HISTORY_ENTRIES)
   }
   return next
-}
-
-const trimHistoryForPrompt = (history: ConversationTurn[]): ConversationTurn[] => {
-  const reversed = [...history].reverse()
-  const trimmed: ConversationTurn[] = []
-  let charCount = 0
-  for (const turn of reversed) {
-    if (trimmed.length >= MAX_PROMPT_TURNS) break
-    const length = turn.text.length
-    if (charCount + length > MAX_PROMPT_CHARACTERS && trimmed.length > 0) {
-      break
-    }
-    trimmed.push(turn)
-    charCount += length
-  }
-  return trimmed.reverse()
 }
 
 const analyzeWithVader = (text: string): number | null => {
@@ -185,353 +153,6 @@ const computeContextSignals = (history: ConversationTurn[]): ContextSignals => {
 
 const isRecord = (value: unknown): value is Record<string, any> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
-
-const coerceStringArray = (value: unknown): string[] =>
-  Array.isArray(value) ? value.filter((item) => typeof item === 'string').map(String) : []
-
-const COMPLETED_STATES = new Set(['done', 'complete', 'completed', 'achieved', 'finished', 'yes', 'true'])
-
-const resolveDoneState = (value: unknown): boolean => {
-  if (typeof value === 'boolean') return value
-  if (typeof value === 'number') return Number.isFinite(value) ? value > 0 : false
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase()
-    if (COMPLETED_STATES.has(normalized)) return true
-    if (normalized === 'not started' || normalized === 'todo' || normalized === 'to do') return false
-    if (normalized === 'in progress' || normalized === 'pending') return false
-    return false
-  }
-  if (isRecord(value)) {
-    if ('done' in value) return resolveDoneState(value.done)
-    if ('status' in value) return resolveDoneState(value.status)
-    if ('state' in value) return resolveDoneState(value.state)
-  }
-  return false
-}
-
-const resolveDescription = (value: unknown): string | undefined => {
-  if (isRecord(value) && typeof value.description === 'string') {
-    return value.description
-  }
-  return undefined
-}
-
-const coerceChecklistItems = (value: unknown): ChecklistItemState[] => {
-  if (Array.isArray(value)) {
-    return value
-      .filter((item) => item && typeof item === 'object' && 'name' in (item as Record<string, unknown>))
-      .map((item: any) => ({
-        name: String(item.name),
-        done: resolveDoneState(item.done),
-        description:
-          typeof item.description === 'string' ? item.description : resolveDescription(item.description)
-      }))
-  }
-  if (isRecord(value)) {
-    return Object.entries(value).map(([name, status]) => ({
-      name: String(name),
-      done: resolveDoneState(status),
-      description: resolveDescription(status)
-    }))
-  }
-  return []
-}
-
-const mergeChecklistItems = (items: ChecklistItemState[]): ChecklistItemState[] => {
-  const map = new Map<string, ChecklistItemState>()
-  for (const item of items) {
-    const key = item.name.toLowerCase()
-    const existing = map.get(key)
-    if (existing) {
-      map.set(key, {
-        name: item.name || existing.name,
-        done: existing.done || item.done,
-        description: item.description ?? existing.description
-      })
-    } else {
-      map.set(key, item)
-    }
-  }
-  return Array.from(map.values())
-}
-
-const extractCompletedFromRecord = (value: unknown): string[] => {
-  if (!isRecord(value)) return []
-  return Object.entries(value)
-    .filter(([, status]) => resolveDoneState(status))
-    .map(([name]) => String(name))
-}
-
-const pickString = (...candidates: unknown[]): string | undefined => {
-  for (const candidate of candidates) {
-    if (typeof candidate === 'string' && candidate.trim().length > 0) {
-      return candidate
-    }
-  }
-  return undefined
-}
-
-const firstRecord = (...candidates: unknown[]): Record<string, any> | undefined => {
-  for (const candidate of candidates) {
-    if (isRecord(candidate)) return candidate
-  }
-  return undefined
-}
-
-const collectTextSnippets = (...values: unknown[]): string[] => {
-  const snippets: string[] = []
-  const push = (value: unknown) => {
-    if (typeof value === 'string') {
-      const trimmed = value.trim()
-      if (trimmed) {
-        snippets.push(trimmed)
-      }
-    }
-  }
-  const visit = (value: unknown) => {
-    if (!value) return
-    if (typeof value === 'string') {
-      push(value)
-      return
-    }
-    if (Array.isArray(value)) {
-      value.forEach(visit)
-      return
-    }
-    if (isRecord(value)) {
-      const candidateKeys = [
-        'line',
-        'text',
-        'message',
-        'prompt',
-        'statement',
-        'guidance',
-        'suggestion',
-        'ask',
-        'question'
-      ] as const
-      for (const key of candidateKeys) {
-        push(value[key])
-      }
-      if (Array.isArray(value.items)) {
-        value.items.forEach(visit)
-      }
-      if (Array.isArray(value.options)) {
-        value.options.forEach(visit)
-      }
-    }
-  }
-  values.forEach(visit)
-  return Array.from(new Set(snippets))
-}
-
-const mapProposal = (payload: any, raw: string): Proposal => {
-  const guidance = isRecord(payload?.guidance) ? payload.guidance : undefined
-  const actions = isRecord(payload?.actions) ? payload.actions : undefined
-  const bestNext = firstRecord(
-    guidance?.best_next_thing,
-    guidance?.bestNextThing,
-    guidance?.next_best_thing,
-    guidance?.nextBestThing,
-    payload?.best_next_thing,
-    payload?.bestNextThing,
-    payload?.next_best_thing,
-    payload?.nextBestThing,
-    actions?.best_next_thing,
-    actions?.bestNextThing,
-    actions?.next_best_thing,
-    actions?.nextBestThing
-  )
-
-  const bestNextLine = bestNext
-    ? pickString(
-        bestNext.next_line,
-        bestNext.nextLine,
-        bestNext.best_next_line,
-        bestNext.bestNextLine,
-        bestNext.line,
-        bestNext.text,
-        bestNext.guidance,
-        bestNext.statement,
-        bestNext.message,
-        bestNext.prompt
-      )
-    : undefined
-
-  const nextLineSource =
-    pickString(
-      guidance?.next_line,
-      guidance?.nextLine,
-      guidance?.nextbest_line,
-      guidance?.nextBestLine,
-      guidance?.next_best_line,
-      payload?.next_line,
-      payload?.nextLine,
-      payload?.nextbest_line,
-      payload?.nextBestLine,
-      payload?.next_best_line,
-      actions?.nextbest_line,
-      actions?.nextBestLine,
-      actions?.next_best_line,
-      bestNextLine
-    ) || raw
-
-  const bestNextRationale = bestNext
-    ? pickString(
-        bestNext.rationale,
-        bestNext.reason,
-        bestNext.reasoning,
-        bestNext.why,
-        bestNext.context,
-        bestNext.explanation
-      )
-    : undefined
-
-  const rationaleSource =
-    pickString(guidance?.rationale, payload?.rationale, bestNextRationale) || ''
-
-  const followupSource =
-    guidance?.suggested_followups ??
-    guidance?.followups ??
-    guidance?.nextbest_followups ??
-    guidance?.nextBestFollowups ??
-    guidance?.next_best_followups ??
-    payload?.followups ??
-    payload?.nextbest_followups ??
-    payload?.nextBestFollowups ??
-    payload?.next_best_followups ??
-    actions?.suggested_followups ??
-    actions?.followups ??
-    actions?.nextbest_followups ??
-    actions?.nextBestFollowups ??
-    actions?.next_best_followups
-
-  const bestNextFollowups = bestNext
-    ? collectTextSnippets(
-        bestNext.followups,
-        bestNext.suggested_followups,
-        bestNext.next_questions,
-        bestNext.nextQuestions,
-        bestNext.questions,
-        bestNext.follow_up_questions,
-        bestNext.followUpQuestions,
-        bestNext.asks
-      )
-    : []
-
-  const extraGuidanceFollowups = collectTextSnippets(
-    guidance?.capture_outcome,
-    guidance?.captureOutcome,
-    guidance?.confirm_success,
-    guidance?.confirmSuccess,
-    guidance?.validate_success_metrics,
-    guidance?.validateSuccessMetrics,
-    guidance?.reinforce_value,
-    guidance?.reinforceValue,
-    guidance?.highlight_reason_to_partner,
-    guidance?.highlightReasonToPartner,
-    actions?.capture_outcome,
-    actions?.captureOutcome,
-    actions?.confirm_success,
-    actions?.confirmSuccess,
-    actions?.validate_success_metrics,
-    actions?.validateSuccessMetrics
-  )
-
-  const normalizedFollowups = Array.from(
-    new Set(
-      [
-        ...coerceStringArray(followupSource),
-        ...collectTextSnippets(followupSource),
-        ...bestNextFollowups,
-        ...extraGuidanceFollowups
-      ]
-        .map((item) => item.trim())
-        .filter((item) => item.length > 0)
-    )
-  )
-
-  const expectedRaw =
-    guidance?.expected_customer_reply_type ??
-    guidance?.expectedCustomerReplyType ??
-    guidance?.expected_nextbest_reply_type ??
-    payload?.expected_customer_reply_type ??
-    payload?.expectedCustomerReplyType ??
-    payload?.expected_nextbest_reply_type ??
-    actions?.expected_customer_reply_type ??
-    actions?.expectedCustomerReplyType ??
-    actions?.expected_nextbest_reply_type ??
-    (typeof bestNext?.expected_customer_reply_type === 'string'
-      ? bestNext.expected_customer_reply_type
-      : typeof bestNext?.expectedCustomerReplyType === 'string'
-      ? bestNext.expectedCustomerReplyType
-      : typeof bestNext?.expected_reply_type === 'string'
-      ? bestNext.expected_reply_type
-      : typeof bestNext?.expectedReplyType === 'string'
-      ? bestNext.expectedReplyType
-      : undefined)
-
-  const expected: Proposal['expectedCustomerReplyType'] =
-    expectedRaw === 'yes_no' || expectedRaw === 'narrative' || expectedRaw === 'selection'
-      ? expectedRaw
-      : 'open_question'
-
-  const objectionSource =
-    (isRecord(guidance?.objection) && guidance.objection) ||
-    (isRecord(payload?.objection) && payload.objection) ||
-    (isRecord(actions?.objection) && actions.objection) ||
-    undefined
-
-  const objectionPayload: ProposalObjection = {
-    detected: Boolean(objectionSource?.detected),
-    category:
-      typeof objectionSource?.category === 'string' && objectionSource.category.length
-        ? objectionSource.category
-        : undefined,
-    suggestions: coerceStringArray(objectionSource?.suggestions)
-  }
-
-  const checklistItems = mergeChecklistItems(
-    [
-      payload?.checklist,
-      guidance?.checklist,
-      actions?.update_checklist,
-      bestNext?.checklist,
-      bestNext?.checklist_updates,
-      bestNext?.checklistUpdates
-    ].flatMap((source) => coerceChecklistItems(source))
-  )
-
-  const goalsProgress = Array.from(
-    new Set(
-      [
-        ...coerceStringArray(payload?.goals_progress),
-        ...coerceStringArray(guidance?.goals_progress),
-        ...coerceStringArray(guidance?.goal_progress),
-        ...extractCompletedFromRecord(guidance?.goals_progress),
-        ...extractCompletedFromRecord(guidance?.goal_progress),
-        ...extractCompletedFromRecord(actions?.update_goal_progress),
-        ...coerceStringArray(bestNext?.goals_progress),
-        ...coerceStringArray(bestNext?.goal_progress),
-        ...collectTextSnippets(bestNext?.goals_progress),
-        ...collectTextSnippets(bestNext?.goal_progress)
-      ]
-        .map((item) => item.trim())
-        .filter((item) => item.length > 0)
-    )
-  )
-
-  return {
-    nextLine: nextLineSource.trim(),
-    rationale: rationaleSource.trim(),
-    goalsProgress,
-    expectedCustomerReplyType: expected,
-    objection: objectionPayload,
-    followups: normalizedFollowups,
-    checklist: checklistItems,
-    raw
-  }
-}
 
 export function useConversationEngine({
   script: externalScript,
@@ -577,7 +198,6 @@ export function useConversationEngine({
   const goalsRef = useRef<GoalState[]>(baseGoals.map((goal) => ({ ...goal })))
   const checklistRef = useRef<ChecklistItemState[]>(baseChecklist.map((item) => ({ ...item })))
   const proposalRef = useRef<Proposal | null>(null)
-  const streamingBufferRef = useRef('')
   const abortControllerRef = useRef<AbortController | null>(null)
   const lastCustomerTextRef = useRef<string>('')
 
@@ -707,7 +327,7 @@ export function useConversationEngine({
   const contextSignals = useMemo(() => computeContextSignals(history), [history])
 
   const addUtterance = useCallback(
-    (role: 'agent' | 'customer', text: string) => {
+    (role: 'agent' | 'customer', text: string, metadata?: ConversationTurn['metadata']) => {
       const trimmed = text.trim()
       if (!trimmed) return
       const sentiment = analyzeWithVader(trimmed)
@@ -716,7 +336,8 @@ export function useConversationEngine({
         role,
         text: trimmed,
         timestamp: new Date().toISOString(),
-        sentiment
+        sentiment,
+        metadata
       }
       setHistory((prev) => {
         const next = appendEntry(prev, entry)
@@ -736,8 +357,8 @@ export function useConversationEngine({
   )
 
   const addAgentUtterance = useCallback(
-    (text: string) => {
-      addUtterance('agent', text)
+    (text: string, metadata?: ConversationTurn['metadata']) => {
+      addUtterance('agent', text, metadata)
     },
     [addUtterance]
   )
@@ -832,241 +453,145 @@ export function useConversationEngine({
       if (abortControllerRef.current) {
         abortControllerRef.current.abort()
       }
+
       const controller = new AbortController()
       abortControllerRef.current = controller
       setLoading(true)
       setError(null)
       setToast(null)
-      streamingBufferRef.current = ''
       setStreamingNextLine('')
 
-      let promptHistory = trimHistoryForPrompt(historyRef.current)
-      const systemPrompt = buildSystemPrompt({
-        persona,
-        plan,
-        script,
-        objectionLibrary
-      })
+      const lastCustomer = (objectionText ?? '').trim() || lastCustomerTextRef.current.trim()
+      if (!lastCustomer) {
+        setLoading(false)
+        setError('Log the latest customer message to get coaching.')
+        return null
+      }
 
-      let userContext = renderUserContext({
+      const contextPrompt = buildCoachStateContext({
+        persona,
         plan,
         goals: goalsRef.current,
         checklist: checklistRef.current,
-        history: promptHistory,
+        history: historyRef.current,
         contextSignals,
         mode,
         objectionText
       })
 
-      const resolvePromptStats = () => {
-        const promptTokens = estimateTokens(systemPrompt) + estimateTokens(userContext)
-        const rawAvailable = MAX_TOTAL_TOKENS - promptTokens
-        return {
-          rawAvailable,
-          availableWithMargin: rawAvailable - TOKEN_SAFETY_MARGIN
-        }
-      }
-
-      let { rawAvailable, availableWithMargin } = resolvePromptStats()
-
-      while (availableWithMargin < MIN_COMPLETION_TOKENS && promptHistory.length > 0) {
-        promptHistory = promptHistory.slice(1)
-        userContext = renderUserContext({
-          plan,
-          goals: goalsRef.current,
-          checklist: checklistRef.current,
-          history: promptHistory,
-          contextSignals,
-          mode,
-          objectionText
+      const sendRequest = async (reminder: boolean) => {
+        const userPrompt = buildCoachUserPrompt({
+          lastCustomerMessage: lastCustomer,
+          history: historyRef.current,
+          reminder
         })
-        ;({ rawAvailable, availableWithMargin } = resolvePromptStats())
-      }
-
-      let maxTokens = Math.min(
-        MAX_COMPLETION_TOKENS,
-        Math.max(MIN_COMPLETION_TOKENS, availableWithMargin)
-      )
-
-      if (availableWithMargin < MIN_COMPLETION_TOKENS) {
-        maxTokens = Math.min(
-          MAX_COMPLETION_TOKENS,
-          Math.max(MIN_COMPLETION_TOKENS, rawAvailable)
-        )
-      }
-
-      if (rawAvailable <= 0) {
-        maxTokens = 0
-      } else if (maxTokens > rawAvailable) {
-        maxTokens = rawAvailable
-      }
-
-      if (maxTokens > 0 && maxTokens < 64) {
-        maxTokens = Math.min(64, rawAvailable)
-      }
-
-      const completionTokens = Math.floor(Math.max(0, maxTokens))
-
-      const messages: ChatMessage[] = [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userContext }
-      ]
-
-      let responseText = ''
-      try {
-        responseText = await streamChat(messages, {
-          json: true,
-          maxTokens: completionTokens > 0 ? completionTokens : undefined,
+        const messages = buildCoachMessages(SALES_COACH_SYSTEM, contextPrompt, userPrompt)
+        return streamChat(messages, {
+          model: 'llama-3.1-8b-instant',
+          temperature: 0.3,
+          maxTokens: COACH_COMPLETION_TOKENS,
           signal: controller.signal,
-          onToken: (token) => {
-            streamingBufferRef.current += token
-            const preview = extractNextLinePreview(streamingBufferRef.current)
-            if (preview) {
-              setStreamingNextLine(preview)
-            }
+          stream: false,
+          stop: Array.from(COACH_STOP_SEQUENCES),
+          responseFormat: COACH_RESPONSE_FORMAT
+        })
+      }
+
+      let attempts = 0
+      let reminder = false
+      let toastIssued = false
+      let processedSuggestion: ProcessedCoachSuggestion | null = null
+      let rawContent = ''
+      let lastError: unknown = null
+
+      while (attempts < 2) {
+        attempts += 1
+        try {
+          rawContent = await sendRequest(reminder)
+          const trimmed = rawContent.trim()
+          if (!trimmed) {
+            throw new CoachSuggestionError('Coach returned an empty response', 'missing_agent_line')
           }
-        })
-      } catch (streamError: any) {
-        if (streamError?.name === 'AbortError') {
-          setLoading(false)
-          return proposalRef.current ?? null
-        }
-        setError(streamError?.message ?? 'Failed to contact assistant')
-        setLoading(false)
-        throw streamError
-      }
 
-      const guidance = parseAIGuidance(responseText || '')
+          const processed = processCoachResponse(trimmed)
+          if (processed.requiresReminder && !reminder) {
+            reminder = true
+            continue
+          }
+          if (processed.requiresReminder && reminder) {
+            throw new CoachSuggestionError('Coach attempted to role-play the customer', 'customer_roleplay')
+          }
 
-      if (!guidance.__parsed && guidance.__raw.trim().length > 0) {
-        setToast({
-          id: createId('toast'),
-          tone: 'warning',
-          message: 'AI response was not valid JSON. Showing raw suggestion.'
-        })
-      }
+          processedSuggestion = processed
+          break
+        } catch (error: any) {
+          if (error?.name === 'AbortError') {
+            setLoading(false)
+            return proposalRef.current ?? null
+          }
 
-      const fallbackNextLine =
-        extractNextLinePreview(streamingBufferRef.current) ||
-        guidance.next_best_thing ||
-        responseText ||
-        ''
-      const followupSource = guidance['follow-ups'] ?? guidance.followups ?? []
-
-      let payload: any = null
-      if (guidance.__parsed && isRecord(guidance.__source)) {
-        const source = guidance.__source as Record<string, unknown>
-        const normalizedGuidance = isRecord(source.guidance) ? source.guidance : source
-        payload = {
-          ...source,
-          guidance: normalizedGuidance,
-          next_line: guidance.next_best_thing,
-          rationale: guidance.rationale ?? source.rationale,
-          followups: followupSource,
-          checklist: guidance.checklist_progress ?? source.checklist ?? source.checklist_progress,
-          checklist_progress: guidance.checklist_progress ?? source.checklist_progress
-        }
-      }
-
-      if (!payload) {
-        payload = {
-          next_line: guidance.next_best_thing || fallbackNextLine,
-          rationale: guidance.rationale,
-          followups: followupSource,
-          checklist: guidance.checklist_progress,
-          checklist_progress: guidance.checklist_progress
-        }
-      }
-
-      const rawForProposal = guidance.__raw || responseText || fallbackNextLine
-      const proposal = mapProposal(payload, rawForProposal)
-      const resolvedNextLine = proposal.nextLine.trim().length
-        ? proposal.nextLine
-        : fallbackNextLine.trim()
-      const normalizedProposal = resolvedNextLine === proposal.nextLine
-        ? proposal
-        : { ...proposal, nextLine: resolvedNextLine }
-      setCurrentProposal(normalizedProposal)
-      proposalRef.current = normalizedProposal
-      setStreamingNextLine('')
-
-      setGoals((prev) => {
-        if (!normalizedProposal.goalsProgress.length) return prev
-        const accomplished = new Set(
-          normalizedProposal.goalsProgress.map((item) => item.toLowerCase())
-        )
-        const next = prev.map((goal) =>
-          accomplished.has(goal.name.toLowerCase()) ? { ...goal, done: true } : goal
-        )
-        goalsRef.current = next
-        return next
-      })
-
-      if (normalizedProposal.checklist.length) {
-        setChecklist((prev) => {
-          const map = new Map<string, ChecklistItemState>()
-          prev.forEach((item) => {
-            map.set(item.name.toLowerCase(), { ...item })
-          })
-          normalizedProposal.checklist.forEach((item) => {
-            const key = item.name.toLowerCase()
-            const existing = map.get(key)
-            if (existing) {
-              map.set(key, { ...existing, done: item.done })
-            } else {
-              map.set(key, { ...item })
-            }
-          })
-          const merged = Array.from(map.values())
-          checklistRef.current = merged
-          return merged
-        })
-      }
-
-      const assistantSentiment = analyzeWithVader(normalizedProposal.nextLine)
-      const assistantEntry: ConversationTurn = {
-        id: createId('assistant-turn'),
-        role: 'assistant',
-        text: normalizedProposal.nextLine,
-        timestamp: new Date().toISOString(),
-        sentiment: assistantSentiment,
-        metadata: {
-          proposal: normalizedProposal
-        }
-      }
-
-      setHistory((prev) => {
-        const next = appendEntry(prev, assistantEntry)
-        if (normalizedProposal.objection.detected && normalizedProposal.objection.category) {
-          for (let i = next.length - 1; i >= 0; i--) {
-            const turn = next[i]
-            if (turn.id === assistantEntry.id) continue
-            if (turn.role === 'customer') {
-              const existingMeta = turn.metadata ?? {}
-              next[i] = {
-                ...turn,
-                metadata: {
-                  ...existingMeta,
-                  objectionCategory: normalizedProposal.objection.category
-                }
+          if (error instanceof CoachSuggestionError) {
+            if ((error.code === 'invalid_json' || error.code === 'missing_agent_line') && attempts < 2) {
+              if (!toastIssued) {
+                setToast({
+                  id: createId('coach-retry'),
+                  tone: 'warning',
+                  message: 'Coach is thinking—please try again'
+                })
+                toastIssued = true
               }
-              break
+              continue
             }
+            lastError = error
+            break
           }
-        }
-        historyRef.current = next
-        return next
-      })
 
-      if (assistantSentiment === null && normalizedProposal.nextLine) {
-        void enhanceSentiment(assistantEntry.id, normalizedProposal.nextLine)
+          lastError = error
+          break
+        }
       }
 
+      abortControllerRef.current = null
+
+      if (!processedSuggestion) {
+        const message = lastError instanceof Error ? lastError.message : 'Coach unavailable. Please try again.'
+        setError(message)
+        setLoading(false)
+        return null
+      }
+
+      const suggestion = processedSuggestion.suggestion
+      const proposal: Proposal = {
+        nextLine: suggestion.agent_line,
+        rationale: suggestion.rationale,
+        goalsProgress: [],
+        expectedCustomerReplyType: undefined,
+        objection: { detected: false, suggestions: [] },
+        followups: suggestion.follow_ups,
+        checklist: [],
+        raw: rawContent
+      }
+
+      setCurrentProposal(proposal)
+      proposalRef.current = proposal
+      setStreamingNextLine('')
       setLoading(false)
-      return normalizedProposal
+      return proposal
     },
-    [contextSignals, enhanceSentiment, objectionLibrary, persona, plan, script]
+    [contextSignals, persona, plan]
   )
+
+  const insertCoachSuggestion = useCallback(() => {
+    const proposal = proposalRef.current
+    if (!proposal) return null
+    const trimmed = proposal.nextLine.trim()
+    if (!trimmed) return null
+    addAgentUtterance(trimmed, { proposal })
+    setCurrentProposal(null)
+    proposalRef.current = null
+    setStreamingNextLine('')
+    return trimmed
+  }, [addAgentUtterance])
 
   const handleObjection = useCallback(
     async (text?: string) => {
@@ -1093,6 +618,7 @@ export function useConversationEngine({
     addAgentUtterance,
     addCustomerUtterance,
     proposeNext,
+    insertCoachSuggestion,
     handleObjection,
     reset,
     exportTranscript,
