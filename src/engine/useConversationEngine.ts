@@ -3,6 +3,7 @@ import { SentimentIntensityAnalyzer } from 'vader-sentiment'
 import { saveAs } from 'file-saver'
 import { createId } from '../lib/id'
 import { streamChat, type ChatMessage } from '../lib/groq'
+import { parseAIGuidance } from '../lib/parseAIGuidance'
 import { buildSystemPrompt, renderUserContext } from './prompt'
 import { SALES_PLAN } from '../knowledge/plan'
 import { OBJECTION_LIBRARY } from '../knowledge/objections'
@@ -935,27 +936,50 @@ export function useConversationEngine({
         throw streamError
       }
 
-      let payload: any = null
-      let parsed = false
-      if (responseText) {
-        try {
-          payload = JSON.parse(responseText)
-          parsed = true
-        } catch (parseError) {
-          setToast({
-            id: createId('toast'),
-            tone: 'warning',
-            message: 'AI response was not valid JSON. Showing raw suggestion.'
-          })
-        }
+      const guidance = parseAIGuidance(responseText || '')
+
+      if (!guidance.__parsed && guidance.__raw.trim().length > 0) {
+        setToast({
+          id: createId('toast'),
+          tone: 'warning',
+          message: 'AI response was not valid JSON. Showing raw suggestion.'
+        })
       }
 
       const fallbackNextLine =
-        extractNextLinePreview(streamingBufferRef.current) || responseText || ''
-      const rawForProposal = responseText || fallbackNextLine
-      const proposal = parsed
-        ? mapProposal(payload, rawForProposal)
-        : mapProposal({ next_line: fallbackNextLine }, rawForProposal)
+        extractNextLinePreview(streamingBufferRef.current) ||
+        guidance.next_best_thing ||
+        responseText ||
+        ''
+      const followupSource = guidance['follow-ups'] ?? guidance.followups ?? []
+
+      let payload: any = null
+      if (guidance.__parsed && isRecord(guidance.__source)) {
+        const source = guidance.__source as Record<string, unknown>
+        const normalizedGuidance = isRecord(source.guidance) ? source.guidance : source
+        payload = {
+          ...source,
+          guidance: normalizedGuidance,
+          next_line: guidance.next_best_thing,
+          rationale: guidance.rationale ?? source.rationale,
+          followups: followupSource,
+          checklist: guidance.checklist_progress ?? source.checklist ?? source.checklist_progress,
+          checklist_progress: guidance.checklist_progress ?? source.checklist_progress
+        }
+      }
+
+      if (!payload) {
+        payload = {
+          next_line: guidance.next_best_thing || fallbackNextLine,
+          rationale: guidance.rationale,
+          followups: followupSource,
+          checklist: guidance.checklist_progress,
+          checklist_progress: guidance.checklist_progress
+        }
+      }
+
+      const rawForProposal = guidance.__raw || responseText || fallbackNextLine
+      const proposal = mapProposal(payload, rawForProposal)
       const resolvedNextLine = proposal.nextLine.trim().length
         ? proposal.nextLine
         : fallbackNextLine.trim()

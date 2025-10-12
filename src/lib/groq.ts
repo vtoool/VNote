@@ -16,6 +16,38 @@ export interface StreamChatOptions {
 }
 
 const DEFAULT_MODEL = 'llama-3.1-8b-instant'
+const GUIDANCE_RESPONSE_FORMAT = {
+  type: 'json_schema',
+  json_schema: {
+    name: 'guidance',
+    strict: true,
+    schema: {
+      type: 'object',
+      properties: {
+        next_best_thing: { type: 'string' },
+        rationale: { type: 'string' },
+        'follow-ups': {
+          type: 'array',
+          items: { type: 'string' }
+        },
+        followups: {
+          type: 'array',
+          items: { type: 'string' }
+        },
+        checklist_progress: {
+          type: 'object',
+          additionalProperties: {
+            anyOf: [{ type: 'number' }, { type: 'boolean' }]
+          }
+        }
+      },
+      required: ['next_best_thing'],
+      additionalProperties: true
+    }
+  }
+} as const
+
+const JSON_OBJECT_RESPONSE_FORMAT = { type: 'json_object' } as const
 
 export async function streamChat(
   messages: ChatMessage[],
@@ -46,7 +78,7 @@ export async function streamChat(
   }
 
   if (json) {
-    body.response_format = { type: 'json_object' }
+    body.response_format = GUIDANCE_RESPONSE_FORMAT ?? JSON_OBJECT_RESPONSE_FORMAT
   }
 
   const response = await fetch(`${base}/chat`, {
