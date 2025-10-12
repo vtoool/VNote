@@ -224,11 +224,6 @@ export default function CallModePanel({
       if (!content) return
       setAgentDraft('')
       conversation.addAgentUtterance(content)
-      try {
-        await conversation.proposeNext()
-      } catch (error) {
-        console.error('Failed to generate next line', error)
-      }
     },
     [agentDraft, conversation]
   )
@@ -279,6 +274,10 @@ export default function CallModePanel({
     } catch (error) {
       console.error('Failed to generate objection handling', error)
     }
+  }, [conversation])
+
+  const handleInsertSuggestion = useCallback(() => {
+    conversation.insertCoachSuggestion()
   }, [conversation])
 
   return (
@@ -350,6 +349,7 @@ export default function CallModePanel({
             onCopy={handleCopy}
             onHandleObjection={handleObjection}
             error={conversation.error}
+            onInsert={handleInsertSuggestion}
           />
 
           <div className="glass-panel space-y-4 p-5">

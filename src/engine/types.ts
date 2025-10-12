@@ -26,7 +26,7 @@ export interface Proposal {
   nextLine: string
   rationale: string
   goalsProgress: string[]
-  expectedCustomerReplyType: ExpectedCustomerReplyType
+  expectedCustomerReplyType?: ExpectedCustomerReplyType
   objection: ProposalObjection
   followups: string[]
   checklist: ChecklistItemState[]
