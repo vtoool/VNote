@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { chat } from '@/lib/ai'
+import { ChatRequestError } from '@/lib/chatClient'
 
 export function SummarizeButton({ text, onResult }: { text: string; onResult?: (s: string) => void }) {
   const [loading, setLoading] = useState(false)
@@ -18,7 +19,11 @@ export function SummarizeButton({ text, onResult }: { text: string; onResult?: (
       setSummary(content)
       onResult?.(content)
     } catch (e: any) {
-      alert(e.message || 'Summarization failed')
+      if (e instanceof ChatRequestError) {
+        alert(e.message)
+      } else {
+        alert(e?.message || 'Summarization failed')
+      }
     } finally {
       setLoading(false)
     }

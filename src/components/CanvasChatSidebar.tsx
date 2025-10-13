@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import MicWidget from "@/components/MicWidget"
-import { chat, ChatMessage } from "@/lib/ai"
+import { chat, type ChatMessage } from "@/lib/ai"
+import { ChatRequestError } from "@/lib/chatClient"
 import { getCanvasPlainText } from "@/lib/canvasText"
 
 type Props = {
@@ -60,7 +61,11 @@ export default function CanvasChatSidebar({ canvas, canvasId, onClose }: Props) 
       const answer = await chat([system, contextMsg, ...nextMessages], { max_tokens: 500, temperature: 0.2 })
       setMessages((prev) => [...prev, { role: "assistant", content: answer }])
     } catch (e: any) {
-      setError(e?.message || "Failed to get AI response")
+      if (e instanceof ChatRequestError) {
+        setError(e.message)
+      } else {
+        setError(e?.message || "Failed to get AI response")
+      }
     } finally {
       setLoading(false)
     }

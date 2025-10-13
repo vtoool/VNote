@@ -2,20 +2,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { SentimentIntensityAnalyzer } from 'vader-sentiment'
 import { saveAs } from 'file-saver'
 import { createId } from '../lib/id'
-import { streamChat } from '../lib/groq'
+import { createChatCompletion, ChatRequestError, DEFAULT_MODEL } from '../lib/chatClient'
 import {
   buildCoachStateContext,
   buildCoachUserPrompt
 } from './prompt'
 import {
-  SALES_COACH_SYSTEM,
-  COACH_RESPONSE_FORMAT,
   COACH_STOP_SEQUENCES,
   processCoachResponse,
   CoachSuggestionError,
   buildCoachMessages,
   type ProcessedCoachSuggestion
 } from './coach'
+import { SALES_COACH_SYSTEM } from '../lib/coach/prompt'
 import { SALES_PLAN } from '../knowledge/plan'
 import { OBJECTION_LIBRARY } from '../knowledge/objections'
 import type {
@@ -34,6 +33,13 @@ import type { Script } from '../lib/storage'
 const STORAGE_NAMESPACE = 'vnote.sales.conversation'
 const MAX_HISTORY_ENTRIES = 150
 const COACH_COMPLETION_TOKENS = 220
+const COACH_RESPONSE_FORMAT = { type: 'json_object' } as const
+const MODEL_STORAGE_KEY = 'vnote.sales.model'
+const AVAILABLE_MODELS = [
+  { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' }
+] as const
 
 export const getConversationStorageKey = (projectId?: string): string =>
   projectId ? `${STORAGE_NAMESPACE}.${projectId}` : STORAGE_NAMESPACE
@@ -193,6 +199,14 @@ export function useConversationEngine({
   const [toast, setToast] = useState<EngineToast | null>(null)
   const [streamingNextLine, setStreamingNextLine] = useState('')
   const [isInitialized, setIsInitialized] = useState(false)
+  const [model, setModelState] = useState<string>(() => {
+    if (typeof window === 'undefined') return DEFAULT_MODEL
+    const stored = window.localStorage.getItem(MODEL_STORAGE_KEY)
+    if (stored && AVAILABLE_MODELS.some((option) => option.value === stored)) {
+      return stored
+    }
+    return DEFAULT_MODEL
+  })
 
   const historyRef = useRef<ConversationTurn[]>([])
   const goalsRef = useRef<GoalState[]>(baseGoals.map((goal) => ({ ...goal })))
@@ -247,6 +261,15 @@ export function useConversationEngine({
     setLoading(false)
     setIsInitialized(true)
   }, [storageKey, baseGoals, baseChecklist, personaName, plan.persona])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.setItem(MODEL_STORAGE_KEY, model)
+    } catch (error) {
+      console.warn('Failed to persist model preference', error)
+    }
+  }, [model])
 
   useEffect(() => {
     historyRef.current = history
@@ -486,15 +509,15 @@ export function useConversationEngine({
           reminder
         })
         const messages = buildCoachMessages(SALES_COACH_SYSTEM, contextPrompt, userPrompt)
-        return streamChat(messages, {
-          model: 'llama-3.1-8b-instant',
+        const { content } = await createChatCompletion(messages, {
+          model,
           temperature: 0.3,
-          maxTokens: COACH_COMPLETION_TOKENS,
+          max_tokens: COACH_COMPLETION_TOKENS,
           signal: controller.signal,
-          stream: false,
           stop: Array.from(COACH_STOP_SEQUENCES),
-          responseFormat: COACH_RESPONSE_FORMAT
+          response_format: COACH_RESPONSE_FORMAT
         })
+        return content
       }
 
       let attempts = 0
@@ -546,6 +569,11 @@ export function useConversationEngine({
             break
           }
 
+          if (error instanceof ChatRequestError) {
+            lastError = error
+            break
+          }
+
           lastError = error
           break
         }
@@ -578,7 +606,7 @@ export function useConversationEngine({
       setLoading(false)
       return proposal
     },
-    [contextSignals, persona, plan]
+    [contextSignals, persona, plan, model]
   )
 
   const insertCoachSuggestion = useCallback(() => {
@@ -601,6 +629,14 @@ export function useConversationEngine({
     [proposeNext]
   )
 
+  const setModel = useCallback((value: string) => {
+    if (AVAILABLE_MODELS.some((option) => option.value === value)) {
+      setModelState(value)
+    } else {
+      setModelState(DEFAULT_MODEL)
+    }
+  }, [])
+
   return {
     plan,
     script,
@@ -620,6 +656,9 @@ export function useConversationEngine({
     proposeNext,
     insertCoachSuggestion,
     handleObjection,
+    model,
+    availableModels: AVAILABLE_MODELS,
+    setModel,
     reset,
     exportTranscript,
     dismissToast
