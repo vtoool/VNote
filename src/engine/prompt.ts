@@ -136,6 +136,7 @@ export function buildCoachUserPrompt({
     segments.push(`Conversation snapshot:\n${snapshot}`)
   }
   segments.push("Provide only the AGENT's next line.")
+  segments.push('Respond with STRICT JSON only.')
   if (reminder) {
     segments.push('REMINDER: Never write Customer lines.')
   }

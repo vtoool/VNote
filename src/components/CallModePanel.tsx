@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import CanvasBoard from './CanvasBoard'
 import { Card, Canvas, Project } from '../lib/storage'
 import { StoreContext } from '../App'
@@ -280,16 +280,37 @@ export default function CallModePanel({
     conversation.insertCoachSuggestion()
   }, [conversation])
 
+  const handleModelChange = useCallback(
+    (event: ChangeEvent<HTMLSelectElement>) => {
+      conversation.setModel(event.target.value)
+    },
+    [conversation]
+  )
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4 rounded-3xl border border-indigo-200/60 bg-white/80 px-5 py-4 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/70">
         <div>
           <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Live sales assistant</h2>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Log every turn to keep Groq’s HUD proposing the next best move in under two seconds.
+            Log every turn to keep Gemini coaching your next best move.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-200">
+            <span>Model</span>
+            <select
+              value={conversation.model}
+              onChange={handleModelChange}
+              className="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-200/60 dark:border-slate-700/60 dark:bg-slate-900/70 dark:text-slate-200 dark:focus:ring-indigo-500/40"
+            >
+              {conversation.availableModels.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <button
             type="button"
             onClick={conversation.reset}

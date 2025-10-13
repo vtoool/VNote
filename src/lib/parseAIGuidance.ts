@@ -1,4 +1,4 @@
-import type { ChatMessage } from './groq'
+import type { ChatMessage } from './chatClient'
 
 export type Guidance = {
   next_best_thing: string

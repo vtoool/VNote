@@ -1,54 +1,10 @@
-import type { ChatMessage } from '../lib/groq'
-
-export const SALES_COACH_SYSTEM = `
-You are VNote’s Sales Coach. You NEVER role-play the customer.
-Your only job: propose the AGENT's next line based on the latest CUSTOMER input and the conversation state.
-
-Rules:
-- Do not write any "Customer:" lines. Ever.
-- Respond with at most 1–2 sentences the agent can actually say next.
-- Be natural, empathetic, and concise. No stage directions.
-- Keep to the agreed sales approach (discovery-first, permission-based).
-- If the last input is unclear, ask one clarifying question the AGENT can say.
-- Language: match the agent’s current language.
-- Output STRICT JSON only (no prose around it) following the provided schema.
-`
+import type { ChatMessage } from '../lib/chatClient'
+import { parseCoach } from '../lib/coach/parse'
+import type { CoachGuidance } from '../lib/coach/schema'
 
 export const COACH_STOP_SEQUENCES = ['\nCustomer:', '\nCUSTOMER:', '\nClient:', '\nProspect:', '\nUSER:'] as const
 
-export const COACH_RESPONSE_FORMAT = {
-  type: 'json_schema',
-  json_schema: {
-    name: 'agent_coach_suggestion',
-    schema: {
-      type: 'object',
-      additionalProperties: false,
-      required: ['agent_line', 'rationale', 'follow_ups'],
-      properties: {
-        agent_line: {
-          type: 'string',
-          description: 'What the AGENT should say next (1–2 sentences, spoken verbatim).'
-        },
-        rationale: {
-          type: 'string',
-          description: 'Why this is the right next line in 1 short sentence.'
-        },
-        follow_ups: {
-          type: 'array',
-          minItems: 1,
-          maxItems: 3,
-          items: { type: 'string' }
-        }
-      }
-    }
-  }
-} as const satisfies Record<string, unknown>
-
-export interface CoachSuggestionPayload {
-  agent_line: string
-  rationale: string
-  follow_ups: string[]
-}
+export interface CoachSuggestionPayload extends CoachGuidance {}
 
 export interface ProcessedCoachSuggestion {
   suggestion: CoachSuggestionPayload
@@ -93,14 +49,9 @@ export const sanitizeAgentLine = (line: string): string => {
 }
 
 export function processCoachResponse(content: string): ProcessedCoachSuggestion {
-  let parsed: any
-  try {
-    parsed = JSON.parse(content)
-  } catch (error) {
-    throw new CoachSuggestionError('Coach response was not valid JSON', 'invalid_json')
-  }
+  const parsed = parseCoach(content)
 
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+  if (!parsed || typeof parsed !== 'object') {
     throw new CoachSuggestionError('Coach response had unexpected shape', 'invalid_json')
   }
 
