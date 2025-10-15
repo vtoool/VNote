@@ -12,6 +12,20 @@ describe('parseCoach', () => {
     expect(result).toEqual(payload)
   })
 
+  it('maps alternative JSON shapes to CoachGuidance', () => {
+    const payload = {
+      next_agent_line: 'Hello there!',
+      reason: 'Friendly greeting.',
+      follow_up_questions: ['Ask about goals']
+    }
+    const result = parseCoach(JSON.stringify(payload))
+    expect(result).toEqual({
+      agent_line: 'Hello there!',
+      rationale: 'Friendly greeting.',
+      follow_ups: ['Ask about goals']
+    })
+  })
+
   it('wraps plain text responses', () => {
     const content = 'Let me know if this time still works for you.'
     const result = parseCoach(content)
