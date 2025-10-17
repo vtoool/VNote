@@ -179,6 +179,21 @@ export default function Landing() {
           </div>
         </section>
 
+        <section className="glass-panel space-y-3 p-6 text-sm text-slate-600 dark:text-slate-300">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-indigo-500">Sandbox</p>
+          <p>
+            Click the{' '}
+            <span
+              className="mx-1 inline-flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold leading-none text-indigo-600 shadow-inner ring-1 ring-indigo-200 dark:bg-slate-900/60 dark:text-indigo-200 dark:ring-indigo-400/40"
+              aria-hidden="true"
+            >
+              *I
+            </span>{' '}
+            pill to see the exact Sabre output. The sandbox mirrors the live assistant so you can follow
+            along with every keystroke before syncing back to the canvas.
+          </p>
+        </section>
+
         <footer className="flex flex-col items-start gap-3 border-t border-white/40 pt-6 text-xs text-slate-500 dark:border-white/10 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} VNote. All rights reserved.</p>
           <div className="flex flex-wrap gap-3">
