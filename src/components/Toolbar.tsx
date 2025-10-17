@@ -2,9 +2,9 @@ import {
   ArrowUturnLeftIcon,
   ArrowUturnRightIcon,
   ArrowDownTrayIcon,
-  ArrowUpOnSquareIcon,
   PhoneArrowUpRightIcon
 } from '@heroicons/react/24/outline'
+import { CheckIcon } from '@heroicons/react/24/solid'
 import { strings } from '../lib/i18n'
 
 interface ToolbarProps {
@@ -57,7 +57,10 @@ export default function Toolbar({
           onClick={onImport}
           className="inline-flex items-center gap-2 rounded-2xl bg-indigo-500/10 px-3 py-2 text-xs font-semibold text-indigo-600 hover:bg-indigo-500/20 dark:text-indigo-200"
         >
-          <ArrowUpOnSquareIcon className="h-4 w-4" /> {strings.import}
+          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-violet-500 text-white">
+            <CheckIcon className="h-4 w-4" aria-hidden="true" />
+          </span>
+          {strings.import}
         </button>
         <button
           onClick={onExportJson}
